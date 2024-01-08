@@ -1,0 +1,4 @@
+logs/*
+wandb/
+*pyc
+logs/
