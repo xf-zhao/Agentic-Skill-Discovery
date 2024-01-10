@@ -6,35 +6,35 @@
 
 import gymnasium as gym
 
-from . import agents, ik_abs_env_cfg, ik_rel_env_cfg, joint_pos_env_cfg
+from . import agents
 
-##
-# Register Gym environments.
-##
+# ##
+# # Register Gym environments.
+# ##
 
-##
-# Joint Position Control
-##
+# ##
+# # Joint Position Control
+# ##
 
-gym.register(
-    id="Play-Cube",
-    entry_point="omni.isaac.orbit.envs:RLTaskEnv",
-    kwargs={
-        "env_cfg_entry_point": joint_pos_env_cfg.FrankaPlayCubeEnvCfg,
-        "rsl_rl_cfg_entry_point": agents.rsl_rl_cfg.PlayCubePPORunnerCfg,
-    },
-    disable_env_checker=True,
-)
+# gym.register(
+#     id="Franka_Table",
+#     entry_point="omni.isaac.orbit.envs:RLTaskEnv",
+#     kwargs={
+#         "env_cfg_entry_point": joint_pos_env_cfg.FrankaPlayCubeEnvCfg,
+#         "rsl_rl_cfg_entry_point": agents.rsl_rl_cfg.PlayCubePPORunnerCfg,
+#     },
+#     disable_env_checker=True,
+# )
 
-gym.register(
-    id="Play-Cube-Play",
-    entry_point="omni.isaac.orbit.envs:RLTaskEnv",
-    kwargs={
-        "env_cfg_entry_point": joint_pos_env_cfg.FrankaCubeLiftEnvCfg_PLAY,
-        "rsl_rl_cfg_entry_point": agents.rsl_rl_cfg.PlayCubePPORunnerCfg,
-    },
-    disable_env_checker=True,
-)
+# gym.register(
+#     id="Play-Cube-Play",
+#     entry_point="omni.isaac.orbit.envs:RLTaskEnv",
+#     kwargs={
+#         "env_cfg_entry_point": joint_pos_env_cfg.FrankaCubeLiftEnvCfg_PLAY,
+#         "rsl_rl_cfg_entry_point": agents.rsl_rl_cfg.PlayCubePPORunnerCfg,
+#     },
+#     disable_env_checker=True,
+# )
 
 # ##
 # # Inverse Kinematics - Absolute Pose Control

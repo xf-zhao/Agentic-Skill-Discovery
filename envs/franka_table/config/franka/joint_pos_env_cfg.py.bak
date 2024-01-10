@@ -7,8 +7,8 @@ from omni.isaac.orbit.sensors import FrameTransformerCfg
 from omni.isaac.orbit.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from omni.isaac.orbit.utils import configclass
 
-from envs.play_cube import mdp
-from envs.play_cube.play_env_cfg import PlayEnvCfg
+from envs.franka_table import mdp
+from source.standalone.zero_hero.envs.franka_table.franka_table_env_cfg import PlayEnvCfg
 
 ##
 # Pre-defined configs
@@ -61,7 +61,7 @@ class FrankaPlayCubeEnvCfg(PlayEnvCfg):
 
 
 @configclass
-class FrankaCubeLiftEnvCfg_PLAY(FrankaPlayCubeEnvCfg):
+class FrankaPlayCubeEnvCfg_PLAY(FrankaPlayCubeEnvCfg):
     def __post_init__(self):
         # post init of parent
         super().__post_init__()

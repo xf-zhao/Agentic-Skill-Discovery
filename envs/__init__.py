@@ -1,1 +1,1 @@
-from . import play_cube
+from . import franka_table

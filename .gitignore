@@ -2,3 +2,6 @@ logs/*
 wandb/
 *pyc
 logs/
+envs_gpt/
+outputs/
+.vscode/

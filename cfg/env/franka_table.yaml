@@ -1,0 +1,4 @@
+task: FrankaTable
+env_name: franka_table
+description: to stack a cube on top of an other cube
+max_iterations: 100000
