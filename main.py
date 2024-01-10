@@ -174,8 +174,8 @@ def main(cfg):
     logging.info("Env description: " + env_description)
 
     env_name = cfg.env.env_name.lower()
-    env_file = f"{ZEROHERO_ROOT_DIR}/envs/{env_name}/{env_name}_env_cfg.py"
-    env_obs_file = f"{ZEROHERO_ROOT_DIR}/envs/{env_name}/{env_name}_env_cfg_obs.py"
+    env_file = f"{ZEROHERO_ROOT_DIR}/envs/{env_name}/env_cfg/{env_name}_env_cfg.py"
+    env_obs_file = f"{ZEROHERO_ROOT_DIR}/envs/{env_name}/env_cfg/{env_name}_env_cfg_obs.py"
 
     env_code_string = file_to_string(env_file)
     env_obs_code_string = file_to_string(env_obs_file)

@@ -65,6 +65,10 @@ import omni.isaac.orbit_tasks  # noqa: F401
 from omni.isaac.orbit_tasks.utils import get_checkpoint_path, parse_env_cfg
 from omni.isaac.orbit_tasks.utils.wrappers.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper
 
+import sys
+dirname = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0,dirname)
+
 import envs, envs_gpt  # noqa: F401
 
 torch.backends.cuda.matmul.allow_tf32 = True

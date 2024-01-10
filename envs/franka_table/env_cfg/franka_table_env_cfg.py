@@ -45,6 +45,9 @@ from envs.franka_table import mdp
 # Scene definition
 ##
 
+import sys, os
+ZEROHERO_ROOT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+
 
 @configclass
 class ObjectTableSceneCfg(InteractiveSceneCfg):
@@ -161,7 +164,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             pos=[0.5, 0, 0.055], rot=[1, 0, 0, 0]
         ),
         spawn=UsdFileCfg(
-            usd_path="envs/franka_table/assets/plate.usd",
+            usd_path=f"{ZEROHERO_ROOT_DIR}/envs/franka_table/assets/plate.usd",
             scale=(0.65e-2, 0.65e-2, 0.65e-2),
             rigid_props=RigidBodyPropertiesCfg(
                 solver_position_iteration_count=16,

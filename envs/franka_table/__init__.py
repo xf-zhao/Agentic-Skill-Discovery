@@ -20,7 +20,7 @@ from envs.franka_table.config.franka import agents
 # Joint Position Control
 ##
 
-from envs.franka_table import franka_table_env_cfg
+from envs.franka_table.env_cfg import franka_table_env_cfg
 
 gym.register(
     id="Franka_Table",
