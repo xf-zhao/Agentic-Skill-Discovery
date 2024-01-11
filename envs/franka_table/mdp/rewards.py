@@ -34,30 +34,7 @@ def drawer_is_grasped(
     # print(f'{object_ee_distance.min()} at {object_ee_distance.argmin()}')
     return encourage_close_reward
 
-def object_is_grasped(
-    env: RLTaskEnv, object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
-    ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
-    robot_cfg: SceneEntityCfg = SceneEntityCfg('robot'),
-) -> torch.Tensor:
-    """Reward the agent for grasping the object"""
-    object: RigidObject = env.scene[object_cfg.name]
-    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
-    cube_pos_w = object.data.root_pos_w
-    ee_w = ee_frame.data.target_pos_w[..., 0, :]
-    object_ee_distance = torch.norm(cube_pos_w - ee_w, dim=1)
-    is_near_cube = torch.where(object_ee_distance < 0.02, 1.0, 0.0)
-    # Knonw that env.scene['robot'].data.body_names[:-2] -> ['panda_leftfinger', 'panda_rightfinger']
-    left_right_finger_pos = env.scene[robot_cfg.name].data.joint_pos[:, -2:].mean(axis=-1)
-    encourage_close_reward = is_near_cube * (0.04 - left_right_finger_pos)
-    # print(f'{object_ee_distance.min()} at {object_ee_distance.argmin()}')
-    return encourage_close_reward
 
-def object_is_lifted(
-    env: RLTaskEnv, minimal_height: float, object_cfg: SceneEntityCfg = SceneEntityCfg("object")
-) -> torch.Tensor:
-    """Reward the agent for lifting the object above the minimal height."""
-    object: RigidObject = env.scene[object_cfg.name]
-    return torch.where(object.data.root_pos_w[:, 2] > minimal_height, 1.0, 0.0)
 
 def drawer_is_dragged(
     env: RLTaskEnv, minimal_distance: float=0.01, object_cfg: SceneEntityCfg = SceneEntityCfg("cabinet")
@@ -86,24 +63,7 @@ def drawer_ee_distance(
 
     return 1 - torch.tanh(object_ee_distance / std)
 
-def object_ee_distance(
-    env: RLTaskEnv,
-    std: float,
-    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
-    ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
-) -> torch.Tensor:
-    """Reward the agent for reaching the object using tanh-kernel."""
-    # extract the used quantities (to enable type-hinting)
-    object: RigidObject = env.scene[object_cfg.name]
-    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
-    # Target object position: (num_envs, 3)
-    cube_pos_w = object.data.root_pos_w
-    # End-effector position: (num_envs, 3)
-    ee_w = ee_frame.data.target_pos_w[..., 0, :]
-    # Distance of the end-effector to the object: (num_envs,)
-    object_ee_distance = torch.norm(cube_pos_w - ee_w, dim=1)
 
-    return 1 - torch.tanh(object_ee_distance / std)
 
 
 def object_goal_distance(

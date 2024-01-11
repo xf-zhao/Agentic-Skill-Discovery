@@ -167,6 +167,7 @@ def main(cfg):
 
     env = cfg.env
     env_description = cfg.env.description
+    task_description = 'Reach cube A.'
     suffix = cfg.suffix
     model = cfg.model
     logging.info(f"Using LLM: {model}")
@@ -175,7 +176,7 @@ def main(cfg):
 
     env_name = cfg.env.env_name.lower()
     env_file = f"{ZEROHERO_ROOT_DIR}/envs/{env_name}/env_cfg/{env_name}_env_cfg.py"
-    env_obs_file = f"{ZEROHERO_ROOT_DIR}/envs/{env_name}/env_cfg/{env_name}_env_cfg_obs.py"
+    env_obs_file = f"{ZEROHERO_ROOT_DIR}/envs/{env_name}/env_cfg/observation.py"
 
     env_code_string = file_to_string(env_file)
     env_obs_code_string = file_to_string(env_obs_file)
@@ -197,7 +198,7 @@ def main(cfg):
         + code_output_tip
     )
     initial_user = initial_user.format(
-        task_obs_code_string=env_obs_code_string, task_description=env_description
+        task_obs_code_string=env_obs_code_string, task_description=task_description
     )
     messages = [
         {"role": "system", "content": initial_system},
@@ -233,7 +234,7 @@ def main(cfg):
             f"Iteration {iter}: Generating {cfg.sample} samples with {cfg.model}"
         )
 
-        while False:
+        while True:
             if total_samples >= cfg.sample:
                 break
             for attempt in range(1000):
@@ -261,10 +262,10 @@ def main(cfg):
             total_completion_token += response_cur["usage"]["completion_tokens"]
             total_token += response_cur["usage"]["total_tokens"]
 
-        responses = [{"message": {"content": FAKE_LLM_REWARD}}]
-        prompt_tokens = -1
-        total_completion_token = -1
-        total_token = -1
+        # responses = [{"message": {"content": FAKE_LLM_REWARD}}]
+        # prompt_tokens = -1
+        # total_completion_token = -1
+        # total_token = -1
 
         if cfg.sample == 1:
             logging.info(

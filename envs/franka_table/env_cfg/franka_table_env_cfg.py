@@ -36,6 +36,18 @@ from omni.isaac.orbit.sim.schemas.schemas_cfg import (
 from omni.isaac.orbit.assets import RigidObjectCfg
 from omni.isaac.orbit.sim.spawners.from_files.from_files_cfg import UsdFileCfg
 from omni.isaac.orbit.actuators import ImplicitActuatorCfg
+from omni.isaac.orbit.sensors import FrameTransformer
+from omni.isaac.orbit.utils.math import combine_frame_transforms
+from omni.isaac.orbit.assets import RigidObject
+from omni.isaac.orbit.managers import SceneEntityCfg
+from omni.isaac.orbit.utils.math import subtract_frame_transforms
+from omni.isaac.orbit.assets import Articulation, RigidObject
+import torch
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from omni.isaac.orbit.envs import RLTaskEnv
+    from omni.isaac.orbit.envs import BaseEnv, RLTaskEnv
 
 from envs.franka_table import mdp
 
@@ -46,7 +58,10 @@ from envs.franka_table import mdp
 ##
 
 import sys, os
-ZEROHERO_ROOT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+
+ZEROHERO_ROOT_DIR = os.path.abspath(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+)
 
 
 @configclass
@@ -212,47 +227,6 @@ class ActionsCfg:
     finger_joint_pos: mdp.BinaryJointPositionActionCfg = MISSING
 
 
-@configclass
-class ObservationsCfg:
-    """Observation specifications for the MDP."""
-
-    @configclass
-    class PolicyCfg(ObsGroup):
-        """Observations for policy group."""
-
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
-        cube_a_position = ObsTerm(
-            func=mdp.object_position_in_robot_root_frame,
-            params={"object_cfg": SceneEntityCfg("cube_a")},
-        )
-        cube_b_position = ObsTerm(
-            func=mdp.object_position_in_robot_root_frame,
-            params={"object_cfg": SceneEntityCfg("cube_b")},
-        )
-        plate_position = ObsTerm(
-            func=mdp.object_position_in_robot_root_frame,
-            params={"object_cfg": SceneEntityCfg("plate")},
-        )
-        drawer_joint_position = ObsTerm(
-            func=mdp.drawer_joint_pos_rel,
-            params={"asset_cfg": SceneEntityCfg("cabinet")},
-        )
-        drawer_position = ObsTerm(
-            func=mdp.drawer_position_in_robot_root_frame,
-            params={"asset_cfg": SceneEntityCfg("cabinet")},
-        )
-        target_object_position = ObsTerm(
-            func=mdp.generated_commands, params={"command_name": "object_pose"}
-        )
-        actions = ObsTerm(func=mdp.last_action)
-
-        def __post_init__(self):
-            self.enable_corruption = True
-            self.concatenate_terms = True
-
-    # observation groups
-    policy: PolicyCfg = PolicyCfg()
 
 
 @configclass
@@ -277,8 +251,6 @@ class RandomizationCfg:
     )
 
 
-
-
 @configclass
 class CurriculumCfg:
     """Curriculum terms for the MDP."""
@@ -300,6 +272,7 @@ class CurriculumCfg:
 
 from .reward import RewardsCfg
 from .termination import TerminationsCfg
+from .observation import ObservationsCfg
 
 
 @configclass
@@ -337,8 +310,6 @@ class FrankaTablePlayEnvCfg(RLTaskEnvCfg):
         self.sim.physx.gpu_total_aggregate_pairs_capacity = 64 * 1024
 
 
-
-
 # Copyright (c) 2022-2023, The ORBIT Project Developers.
 # All rights reserved.
 #
@@ -357,7 +328,6 @@ from omni.isaac.orbit.markers.config import FRAME_MARKER_CFG  # isort: skip
 from omni.isaac.orbit_assets.franka import FRANKA_PANDA_CFG  # isort: skip
 
 
-
 @configclass
 class FrankaTableEnvCfg(FrankaTablePlayEnvCfg):
     def __post_init__(self):
@@ -369,7 +339,10 @@ class FrankaTableEnvCfg(FrankaTablePlayEnvCfg):
 
         # Set actions for the specific robot type (franka)
         self.actions.body_joint_pos = mdp.JointPositionActionCfg(
-            asset_name="robot", joint_names=["panda_joint.*"], scale=0.5, use_default_offset=True
+            asset_name="robot",
+            joint_names=["panda_joint.*"],
+            scale=0.5,
+            use_default_offset=True,
         )
         self.actions.finger_joint_pos = mdp.BinaryJointPositionActionCfg(
             asset_name="robot",
