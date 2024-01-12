@@ -49,7 +49,7 @@ class ObservationsCfg:
 
     @configclass
     class PolicyCfg(ObsGroup):
-        """Observations for policy group."""
+        """Observations for policy learning."""
 
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
@@ -85,41 +85,64 @@ class ObservationsCfg:
 
     @configclass
     class MyObservationCfg(ObsGroup):
-        """Observations for policy group."""
+        """My Observations that can be used to compose reward functions."""
 
+        # robot joint positions
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+
+        # robot joint velocities
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+
+        # robot end-effector position
         ee_position = ObsTerm(func=mdp.ee_position_in_robot_root_frame)
+
+        # robot end-effector two gripper open range
         gripper_open_range = ObsTerm(func=mdp.gripper_open_range)
+
+        # cube A position
         cube_a_position = ObsTerm(
             func=mdp.object_position_in_robot_root_frame,
             params={"object_cfg": SceneEntityCfg("cube_a")},
         )
+
+        # cube B position
         cube_b_position = ObsTerm(
             func=mdp.object_position_in_robot_root_frame,
             params={"object_cfg": SceneEntityCfg("cube_b")},
         )
+
+        # plate position
         plate_position = ObsTerm(
             func=mdp.object_position_in_robot_root_frame,
             params={"object_cfg": SceneEntityCfg("plate")},
         )
+
+        # drawer position
         drawer_position = ObsTerm(
             func=mdp.drawer_position_in_robot_root_frame,
             params={"asset_cfg": SceneEntityCfg("cabinet")},
         )
+
+        # drawer prismatic joint position. Closed: 0; open: > 0 values.
         drawer_joint_position = ObsTerm(
             func=mdp.drawer_joint_pos_rel,
             params={"asset_cfg": SceneEntityCfg("cabinet")},
         )
-        target_object_position = ObsTerm(
-            func=mdp.generated_commands, params={"command_name": "object_pose"}
-        )
+
+        # # goal to reach
+        # target_object_position = ObsTerm(
+        #     func=mdp.generated_commands, params={"command_name": "object_pose"}
+        # )
+
+        # the last action the robot has taken
         actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
             self.enable_corruption = False
             self.concatenate_terms = False
 
-    # observation groups
+    # observation group only for policy learning
     policy: PolicyCfg = PolicyCfg()
+
+    # observation group for users, e.g. reward functions
     observations: MyObservationCfg = MyObservationCfg()

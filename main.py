@@ -16,7 +16,7 @@ from eurekaplus.utils.file_utils import find_files_with_substring, load_tensorbo
 from eurekaplus.utils.create_task import create_task
 from eurekaplus.utils.extract_task_code import *
 
-ZEROHERO_ROOT_DIR = f"{os.getcwd()}/"
+ZEROHERO_ROOT_DIR = f"{os.getcwd()}"
 ORBIT_ROOT_DIR = f"/data/xufeng/workspace/isaac/orbit"
 ISAAC_ROOT_DIR = f"{ORBIT_ROOT_DIR}/_isaac_sim"
 
@@ -37,13 +37,63 @@ gym.register(
 )
 """
 
-REWARD_INIT = """
+SUCCESS_INIT = """
+from __future__ import annotations
 from omni.isaac.orbit.utils import configclass
 from omni.isaac.orbit.managers import SceneEntityCfg
 from omni.isaac.orbit.managers import RewardTermCfg as RewTerm
-
+from omni.isaac.orbit.assets import RigidObject
+from omni.isaac.orbit.managers import SceneEntityCfg
+from omni.isaac.orbit.sensors import FrameTransformer
+from omni.isaac.orbit.utils.math import combine_frame_transforms
 from envs.franka_table import mdp
+import torch
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from omni.isaac.orbit.envs import RLTaskEnv
+
+"""
+
+
+REWARD_INIT = """
+from __future__ import annotations
+from omni.isaac.orbit.utils import configclass
+from omni.isaac.orbit.managers import SceneEntityCfg
+from omni.isaac.orbit.managers import RewardTermCfg as RewTerm
+from omni.isaac.orbit.assets import RigidObject
+from omni.isaac.orbit.managers import SceneEntityCfg
+from omni.isaac.orbit.sensors import FrameTransformer
+from omni.isaac.orbit.utils.math import combine_frame_transforms
+from envs.franka_table import mdp
+import torch
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from omni.isaac.orbit.envs import RLTaskEnv
+
+
+def get_terminate_penalty(terminate_item):
+    return RewTerm(
+        func=terminate_item.func,
+        params=terminate_item.params,
+        weight=-10.0,
+    )
+"""
+
+REWARD_REPLACE_INPUT = """
+@configclass
+class RewardsCfg:
+"""
+
+REWARD_REPLACE_OUTPUT = """
+@configclass
+class RewardsCfg:
+
+    success = SuccessCfg.success
+    terminate_1 = get_terminate_penalty(TerminationsCfg.cube_a_dropping)
+    terminate_2 = get_terminate_penalty(TerminationsCfg.cube_b_dropping)
+    terminate_3 = get_terminate_penalty(TerminationsCfg.plate_dropping)
 
 """
 
@@ -155,6 +205,102 @@ Please have a look.
 """
 
 
+def gpt_compose_function(
+    signature,
+    env_obs_code_string,
+    task_description,
+    initial_system,
+    initial_user,
+    code_output_tip,
+    model="gpt-3.5-turbo",
+    n_samples=1,
+    temperature=0,
+):
+    responses = []
+    total_samples = 0
+    total_completion_token = 0
+    total_token = 0
+
+    initial_system = (
+        initial_system.format(task_success_signature_string=signature) + code_output_tip
+    )
+    initial_user = initial_user.format(
+        task_obs_code_string=env_obs_code_string, task_description=task_description
+    )
+    messages = [
+        {"role": "system", "content": initial_system},
+        {"role": "user", "content": initial_user},
+    ]
+    for msg in messages:
+        print(msg["content"])
+
+    chunk_size = n_samples if "gpt-3.5" in model else 4
+    while True:
+        if total_samples >= n_samples:
+            break
+        for attempt in range(1000):
+            try:
+                response_cur = openai.ChatCompletion.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    n=chunk_size,
+                )
+                total_samples += chunk_size
+                break
+            except Exception as e:
+                if attempt >= 10:
+                    chunk_size = max(int(chunk_size / 2), 1)
+                    print("Current Chunk Size", chunk_size)
+                logging.info(f"Attempt {attempt+1} failed with error: {e}")
+                time.sleep(1)
+        if response_cur is None:
+            logging.info("Code terminated due to too many failed attempts!")
+            exit()
+        responses.extend(response_cur["choices"])
+        prompt_tokens = response_cur["usage"]["prompt_tokens"]
+        total_completion_token += response_cur["usage"]["completion_tokens"]
+        total_token += response_cur["usage"]["total_tokens"]
+
+    # Logging Token Information
+    logging.info(
+        f">>> Prompt Tokens: {prompt_tokens}, Completion Tokens: {total_completion_token}, Total Tokens: {total_token}"
+    )
+
+    if n_samples == 1:
+        logging.info(
+            f"Iteration {iter}: GPT Output:\n "
+            + responses[0]["message"]["content"]
+            + "\n"
+        )
+
+    return responses, total_samples, total_completion_token, total_token
+
+
+def extract_code_string(responses, replace_input=None, replace_output=None):
+    patterns = [
+        r"```python(.*?)```",
+        r"```(.*?)```",
+        r'"""(.*?)"""',
+        r'""(.*?)""',
+        r'"(.*?)"',
+    ]
+    code_runs = []
+    for response in responses:
+        content = response["message"]["content"]
+        # Regex patterns to extract python code enclosed in GPT response
+        for pattern in patterns:
+            code_string = re.search(pattern, content, re.DOTALL)
+            if code_string is not None:
+                code_string = code_string.group(1).strip()
+                break
+        code_string = content if not code_string else code_string
+        if replace_input is not None and replace_output is not None:
+            code_string = code_string.replace(replace_input, replace_output)
+        code_runs.append(code_string)
+    return code_runs
+
+
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")
 def main(cfg):
     trace_history = {}
@@ -167,7 +313,7 @@ def main(cfg):
 
     env = cfg.env
     env_description = cfg.env.description
-    task_description = 'Reach cube A.'
+    task_description = "Reach cube A."
     suffix = cfg.suffix
     model = cfg.model
     logging.info(f"Using LLM: {model}")
@@ -177,39 +323,24 @@ def main(cfg):
     env_name = cfg.env.env_name.lower()
     env_file = f"{ZEROHERO_ROOT_DIR}/envs/{env_name}/env_cfg/{env_name}_env_cfg.py"
     env_obs_file = f"{ZEROHERO_ROOT_DIR}/envs/{env_name}/env_cfg/observation.py"
+    termination_file = f"{ZEROHERO_ROOT_DIR}/envs/{env_name}/env_cfg/termination.py"
 
-    env_code_string = file_to_string(env_file)
     env_obs_code_string = file_to_string(env_obs_file)
-
     # Loading all text prompts
     prompt_dir = f"{ZEROHERO_ROOT_DIR}/eurekaplus/utils/prompts"
-    initial_system = file_to_string(f"{prompt_dir}/initial_system.txt")
+    initial_system_success = file_to_string(f"{prompt_dir}/initial_system_success.txt")
+    initial_user_success = file_to_string(f"{prompt_dir}/initial_user_success.txt")
+    success_signature = file_to_string(f"{prompt_dir}/success_signature.txt")
+
+    initial_system_reward = file_to_string(f"{prompt_dir}/initial_system_reward.txt")
+    initial_user_reward = file_to_string(f"{prompt_dir}/initial_user_reward.txt")
     code_output_tip = file_to_string(f"{prompt_dir}/code_output_tip.txt")
     code_feedback = file_to_string(f"{prompt_dir}/code_feedback.txt")
-    initial_user = file_to_string(f"{prompt_dir}/initial_user.txt")
     reward_signature = file_to_string(f"{prompt_dir}/reward_signature.txt")
     policy_feedback = file_to_string(f"{prompt_dir}/policy_feedback.txt")
     execution_error_feedback = file_to_string(
         f"{prompt_dir}/execution_error_feedback.txt"
     )
-
-    initial_system = (
-        initial_system.format(task_reward_signature_string=reward_signature)
-        + code_output_tip
-    )
-    initial_user = initial_user.format(
-        task_obs_code_string=env_obs_code_string, task_description=task_description
-    )
-    messages = [
-        {"role": "system", "content": initial_system},
-        {"role": "user", "content": initial_user},
-    ]
-    for msg in messages:
-        print(msg["content"])
-
-    # env_code_string = env_code_string.replace(env, env+suffix)
-    # Create Task YAML files
-    # create_task(ZEROHERO_ROOT_DIR, cfg.env.task, cfg.env.env_name, suffix)
 
     DUMMY_FAILURE = -10000.0
     max_successes = []
@@ -222,137 +353,100 @@ def main(cfg):
 
     # Eureka generation loop
     for iter in range(cfg.iteration):
-        # Get Eureka response
-        responses = []
-        response_cur = None
-        total_samples = 0
-        total_token = 0
-        total_completion_token = 0
-        chunk_size = cfg.sample if "gpt-3.5" in model else 4
+        # Get Eureka-plus response
+        # total_tokens = 0
+        # total_samples = 0
+        # total_completion_tokens = 0
 
-        logging.info(
-            f"Iteration {iter}: Generating {cfg.sample} samples with {cfg.model}"
+        logging.info(f"Iteration {iter}: Generating with {cfg.model}")
+
+        # Success condition function
+        responses_success, *_ = gpt_compose_function(
+            signature=success_signature,
+            env_obs_code_string=env_obs_code_string,
+            task_description=task_description,
+            initial_system=initial_system_success,
+            initial_user=initial_user_success,
+            code_output_tip=code_output_tip,
+            model=cfg.model,
+            n_samples=cfg.n_success_samples,
+            temperature=cfg.temperature,
+        )
+        codes_success = extract_code_string(responses_success)
+        if len(codes_success) == 1:
+            codes_success *= cfg.n_reward_samples
+
+        # reward function
+        responses_reward, *_ = gpt_compose_function(
+            signature=reward_signature,
+            env_obs_code_string=env_obs_code_string,
+            task_description=task_description,
+            initial_system=initial_system_reward,
+            initial_user=initial_user_reward,
+            code_output_tip=code_output_tip,
+            model=cfg.model,
+            n_samples=cfg.n_reward_samples,
+            temperature=cfg.temperature,
+        )
+        codes_reward = extract_code_string(
+            responses_reward,
+            replace_input=REWARD_REPLACE_INPUT,
+            replace_output=REWARD_REPLACE_OUTPUT,
         )
 
-        while True:
-            if total_samples >= cfg.sample:
-                break
-            for attempt in range(1000):
-                try:
-                    response_cur = openai.ChatCompletion.create(
-                        model=model,
-                        messages=messages,
-                        temperature=cfg.temperature,
-                        n=chunk_size,
-                    )
-                    total_samples += chunk_size
-                    break
-                except Exception as e:
-                    if attempt >= 10:
-                        chunk_size = max(int(chunk_size / 2), 1)
-                        print("Current Chunk Size", chunk_size)
-                    logging.info(f"Attempt {attempt+1} failed with error: {e}")
-                    time.sleep(1)
-            if response_cur is None:
-                logging.info("Code terminated due to too many failed attempts!")
-                exit()
+        # total_samples += total_sample
+        # total_tokens +=total_token
+        # total_completion_tokens+=total_completion_token
 
-            responses.extend(response_cur["choices"])
-            prompt_tokens = response_cur["usage"]["prompt_tokens"]
-            total_completion_token += response_cur["usage"]["completion_tokens"]
-            total_token += response_cur["usage"]["total_tokens"]
-
-        # responses = [{"message": {"content": FAKE_LLM_REWARD}}]
-        # prompt_tokens = -1
-        # total_completion_token = -1
-        # total_token = -1
-
-        if cfg.sample == 1:
-            logging.info(
-                f"Iteration {iter}: GPT Output:\n "
-                + responses[0]["message"]["content"]
-                + "\n"
-            )
-
-        # Logging Token Information
-        logging.info(
-            f"Iteration {iter}: Prompt Tokens: {prompt_tokens}, Completion Tokens: {total_completion_token}, Total Tokens: {total_token}"
-        )
-
-        code_runs = []
         rl_runs = []
-        for response_id in range(cfg.sample):
-            idx = f'UID{uuid.uuid4().hex[:16]}'
+        for i_sample, (code_success, code_reward) in enumerate(zip(codes_success, codes_reward)):
+
+            logging.info(f"Iteration {iter}: Processing Code Run {i_sample}, Idx: {idx}")
+
+            idx = f"UID{uuid.uuid4().hex[:16]}"
             cur_env_dir = f"{ZEROHERO_ROOT_DIR}/envs_gpt/{env_name}/{idx}"
             if not os.path.exists(cur_env_dir):
                 os.makedirs(cur_env_dir, exist_ok=True)
             shutil.copy(env_file, cur_env_dir)
             shutil.copy(env_obs_file, cur_env_dir)
-            reward_file = f"{cur_env_dir}/reward.py"
-            termination_file = f"{cur_env_dir}/termination.py"
-            output_file = reward_file
-            # with open(reward_file, 'w') as f:
-            # f.write(REWARD_INIT)
-            with open(termination_file, "w") as f:
-                f.write(TERMINATION_INIT)
+            shutil.copy(termination_file, cur_env_dir)
             with open(f"{cur_env_dir}/__init__.py", "w") as f:
                 f.write(MODULE_INIT.replace("UUID_HEX", idx))
 
-            response_cur = responses[response_id]["message"]["content"]
-            logging.info(f"Iteration {iter}: Processing Code Run {response_id}")
+            reward_file = f"{cur_env_dir}/reward.py"
+            with open(reward_file, "w") as file:
+                file.write(REWARD_INIT)
+                file.writelines(code_reward + "\n")
 
-            # Regex patterns to extract python code enclosed in GPT response
-            patterns = [
-                r"```python(.*?)```",
-                r"```(.*?)```",
-                r'"""(.*?)"""',
-                r'""(.*?)""',
-                r'"(.*?)"',
-            ]
-            for pattern in patterns:
-                code_string = re.search(pattern, response_cur, re.DOTALL)
-                if code_string is not None:
-                    code_string = code_string.group(1).strip()
-                    break
-            code_string = response_cur if not code_string else code_string
+            success_file = f"{cur_env_dir}/success.py"
+            with open(success_file, "w") as file:
+                file.write(SUCCESS_INIT)
+                file.writelines(code_success + "\n")
 
-            # Remove unnecessary imports
-            lines = code_string.split("\n")
-            for i, line in enumerate(lines):
-                if line.strip().startswith("def "):
-                    code_string = "\n".join(lines[i:])
+        pass
+            # # Find the freest GPU to run GPU-accelerated RL
+            # set_freest_gpu()
 
-            code_runs.append(code_string)
-
-            # Save the new environment code when the output contains valid code string!
-            file_init_str = REWARD_INIT
-            with open(output_file, "w") as file:
-                file.write(file_init_str)
-                file.writelines(code_string + "\n")
-
-            # Find the freest GPU to run GPU-accelerated RL
-            set_freest_gpu()
-
-            # Execute the python file with flags
-            rl_filepath = f"env_iter{iter}_response{response_id}.txt"
-            with open(rl_filepath, "w") as f:
-                process = subprocess.Popen(
-                    [
-                        f"{ORBIT_ROOT_DIR}/orbit.sh",
-                        "-p",
-                        f"{ZEROHERO_ROOT_DIR}/rsl_rl/train.py",
-                        "--task",
-                        f"{idx}",
-                        "--num_envs",
-                        f"{cfg.num_envs}",
-                    ],
-                    stdout=f,
-                    stderr=f,
-                )
-            block_until_training(
-                rl_filepath, log_status=True, iter_num=iter, response_id=response_id
-            )
-            rl_runs.append(process)
+            # # Execute the python file with flags
+            # rl_filepath = f"env_iter{iter}_response{response_id}.txt"
+            # with open(rl_filepath, "w") as f:
+            #     process = subprocess.Popen(
+            #         [
+            #             f"{ORBIT_ROOT_DIR}/orbit.sh",
+            #             "-p",
+            #             f"{ZEROHERO_ROOT_DIR}/rsl_rl/train.py",
+            #             "--task",
+            #             f"{idx}",
+            #             "--num_envs",
+            #             f"{cfg.num_envs}",
+            #         ],
+            #         stdout=f,
+            #         stderr=f,
+            #     )
+            # block_until_training(
+            #     rl_filepath, log_status=True, iter_num=iter, response_id=response_id
+            # )
+            # rl_runs.append(process)
 
         # Gather RL training results and construct reward reflection
         code_feedbacks = []

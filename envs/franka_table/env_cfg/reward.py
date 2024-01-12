@@ -9,10 +9,20 @@ from omni.isaac.orbit.utils.math import combine_frame_transforms
 from envs.franka_table import mdp
 import torch
 from typing import TYPE_CHECKING
+from .success import SuccessCfg
+from .termination import TerminationsCfg
 
 
 if TYPE_CHECKING:
     from omni.isaac.orbit.envs import RLTaskEnv
+
+
+def get_terminate_penalty(terminate_item):
+    return RewTerm(
+        func=terminate_item.func,
+        params=terminate_item.params,
+        weight=-10.0,
+    )
 
 
 def cube_a_ee_distance(
@@ -47,23 +57,11 @@ def object_is_lifted(env: RLTaskEnv) -> torch.Tensor:
 
 @configclass
 class RewardsCfg:
-    """Reward terms for the MDP."""
 
-    dropping_cube_a = RewTerm(
-        func=mdp.base_height,
-        params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("cube_a")},
-        weight=-10.0,
-    )
-    dropping_cube_b = RewTerm(
-        func=mdp.base_height,
-        params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("cube_b")},
-        weight=-10.0,
-    )
-    dropping_plate = RewTerm(
-        func=mdp.base_height,
-        params={"minimum_height": -0.05, "asset_cfg": SceneEntityCfg("plate")},
-        weight=-10.0,
-    )
+    success = SuccessCfg.success
+    terminate_1 = get_terminate_penalty(TerminationsCfg.cube_a_dropping)
+    terminate_2 = get_terminate_penalty(TerminationsCfg.cube_b_dropping)
+    terminate_3 = get_terminate_penalty(TerminationsCfg.plate_dropping)
 
     reaching_object = RewTerm(
         func=cube_a_ee_distance,

@@ -1,4 +1,5 @@
 import os
+import logging
 
 
 # List and import all sub-modules (in directories)
@@ -9,4 +10,8 @@ for f in files:
     if f.startswith('_'):
         continue
     if os.path.isdir(f'{dirname}/{f}'):
-        exec(f'from . import {f}')
+        try:
+            exec(f'from . import {f}')
+        except Exception as e:
+            logging.info(e)
+

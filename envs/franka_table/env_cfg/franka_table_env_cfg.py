@@ -43,6 +43,16 @@ from omni.isaac.orbit.managers import SceneEntityCfg
 from omni.isaac.orbit.utils.math import subtract_frame_transforms
 from omni.isaac.orbit.assets import Articulation, RigidObject
 import torch
+from omni.isaac.orbit.managers import TerminationTermCfg as DoneTerm
+from omni.isaac.orbit.assets import Articulation, RigidObject
+from omni.isaac.orbit.managers import SceneEntityCfg
+
+if TYPE_CHECKING:
+    from omni.isaac.orbit.envs import RLTaskEnv
+
+from envs.franka_table import mdp
+
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -227,8 +237,6 @@ class ActionsCfg:
     finger_joint_pos: mdp.BinaryJointPositionActionCfg = MISSING
 
 
-
-
 @configclass
 class RandomizationCfg:
     """Configuration for randomization."""
@@ -270,9 +278,9 @@ class CurriculumCfg:
 # Environment configuration
 ##
 
-from .reward import RewardsCfg
-from .termination import TerminationsCfg
 from .observation import ObservationsCfg
+from .termination import TerminationsCfg
+from .reward import RewardsCfg
 
 
 @configclass
