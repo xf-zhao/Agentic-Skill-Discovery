@@ -35,7 +35,7 @@ def ee_position_in_robot_root_frame(env: RLTaskEnv) -> torch.Tensor:
     return ee_pos_b
 
 
-def gripper_open_range(env: RLTaskEnv) -> torch.Tensor:
+def gripper_open_distance(env: RLTaskEnv) -> torch.Tensor:
     # Knonw that env.scene['robot'].data.body_names[:-2] -> ['panda_leftfinger', 'panda_rightfinger']
     robot: RigidObject = env.scene["robot"]
     open_range = robot.data.joint_pos[:, -2:].mean(axis=-1).unsqueeze(-1)

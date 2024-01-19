@@ -1,5 +1,5 @@
 def object_is_lifted(env: RLTaskEnv, obs_name: str, minimal_height: float) -> torch.Tensor:
-    """Sparse reward the agent for lifting the object above the minimal height."""
+    """Sparse reward the agent for lifting an object above a great height."""
     obs = env.obs_buf["observations"]
     object_height = obs[obs_name][:, 2] # x, y, z (height)
     is_success = torch.where(object_height > minimal_height, 1.0, 0.0)
@@ -8,9 +8,9 @@ def object_is_lifted(env: RLTaskEnv, obs_name: str, minimal_height: float) -> to
 
 @configclass
 class SuccessCfg:
-    # Success condition for cube_a to be lifted up to sufficient height, here, a 0.3 meter as an example.
+    # Success condition for cube_a to be lifted up to sufficient height, here, a 0.3 meter as an example for "lift very high".
     success = RewTerm(
         func=object_is_lifted,
-        params={"minimum_height": 0.3, "obs_name": "cube_a_position"}, # Table plane as z = 0
-        weight=1.0,
+        params={"minimum_height": 0.3, "obs_name": "cube_a_position"}, 
+        weight=30.0,
     )

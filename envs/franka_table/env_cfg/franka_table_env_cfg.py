@@ -42,21 +42,16 @@ from omni.isaac.orbit.assets import RigidObject
 from omni.isaac.orbit.managers import SceneEntityCfg
 from omni.isaac.orbit.utils.math import subtract_frame_transforms
 from omni.isaac.orbit.assets import Articulation, RigidObject
-import torch
 from omni.isaac.orbit.managers import TerminationTermCfg as DoneTerm
 from omni.isaac.orbit.assets import Articulation, RigidObject
 from omni.isaac.orbit.managers import SceneEntityCfg
-
-if TYPE_CHECKING:
-    from omni.isaac.orbit.envs import RLTaskEnv
+import torch
+from typing import TYPE_CHECKING
 
 from envs.franka_table import mdp
 
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from omni.isaac.orbit.envs import RLTaskEnv
     from omni.isaac.orbit.envs import BaseEnv, RLTaskEnv
 
 from envs.franka_table import mdp
@@ -76,10 +71,7 @@ ZEROHERO_ROOT_DIR = os.path.abspath(
 
 @configclass
 class ObjectTableSceneCfg(InteractiveSceneCfg):
-    """Configuration for the lift scene with a robot and a object.
-    This is the abstract base implementation, the exact scene is defined in the derived classes
-    which need to set the target object, robot and end-effector frames
-    """
+    """Configuration for the franka-table scene, with a robot arm and two cubes (cube A and cube B), a plate and a drawer with handle."""
 
     # robots: will be populated by agent env cfg
     robot: ArticulationCfg = MISSING
@@ -87,7 +79,6 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     ee_frame: FrameTransformerCfg = MISSING
     # target object: will be populated by agent env cfg
 
-    # Table
     table = AssetBaseCfg(
         prim_path="{ENV_REGEX_NS}/Table",
         init_state=AssetBaseCfg.InitialStateCfg(
@@ -98,14 +89,14 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         ),
     )
 
-    # plane
+    # Plane. Only for physics simulation purpose.
     plane = AssetBaseCfg(
         prim_path="/World/GroundPlane",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[0, 0, -1.05]),
         spawn=GroundPlaneCfg(),
     )
 
-    # lights
+    # lights. Only for physics simulation purpose.
     light = AssetBaseCfg(
         prim_path="/World/light",
         spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
@@ -125,7 +116,6 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
                 solver_position_iteration_count=8,
                 solver_velocity_iteration_count=0,
             ),
-            # collision_props=sim_utils.CollisionPropertiesCfg(contact_offset=0.005, rest_offset=0.0),
         ),
         init_state=ArticulationCfg.InitialStateCfg(
             pos=[1.1, 0, -0.25],
@@ -145,7 +135,6 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         },
     )
 
-    # Set Cube as object
     cube_a = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Cube_A",
         init_state=RigidObjectCfg.InitialStateCfg(
@@ -182,7 +171,6 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             ),
         ),
     )
-    # Add extra objects to play with
     plate = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Plate",
         init_state=RigidObjectCfg.InitialStateCfg(
@@ -190,7 +178,11 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         ),
         spawn=UsdFileCfg(
             usd_path=f"{ZEROHERO_ROOT_DIR}/envs/franka_table/assets/plate.usd",
-            scale=(0.65e-2, 0.65e-2, 0.65e-2),
+            scale=(
+                0.65e-2,
+                0.65e-2,
+                0.65e-2,
+            ),
             rigid_props=RigidBodyPropertiesCfg(
                 solver_position_iteration_count=16,
                 solver_velocity_iteration_count=1,
@@ -212,7 +204,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
 class CommandsCfg:
     """Command terms for the MDP."""
 
-    object_pose = mdp.UniformPoseCommandCfg(
+    specific_target_position_on_table = mdp.UniformPoseCommandCfg(
         asset_name="robot",
         body_name=MISSING,  # will be set by agent env cfg
         resampling_time_range=(5.0, 5.0),
@@ -220,12 +212,28 @@ class CommandsCfg:
         ranges=mdp.UniformPoseCommandCfg.Ranges(
             pos_x=(0.4, 0.6),
             pos_y=(-0.25, 0.25),
-            pos_z=(0.25, 0.5),
+            # pos_z=(0.25, 0.5), # recall that 0 is the table surface height
+            pos_z=(0, 0.04), # recall that 0 is the table surface height
             roll=(0.0, 0.0),
             pitch=(0.0, 0.0),
             yaw=(0.0, 0.0),
         ),
     )
+
+    # specific_target_position_above_table = mdp.UniformPoseCommandCfg(
+    #     asset_name="robot",
+    #     body_name=MISSING,  # will be set by agent env cfg
+    #     resampling_time_range=(5.0, 5.0),
+    #     debug_vis=True,
+    #     ranges=mdp.UniformPoseCommandCfg.Ranges(
+    #         pos_x=(0.4, 0.6),
+    #         pos_y=(-0.25, 0.25),
+    #         pos_z=(0.25, 0.5),
+    #         roll=(0.0, 0.0),
+    #         pitch=(0.0, 0.0),
+    #         yaw=(0.0, 0.0),
+    #     ),
+    # )
 
 
 @configclass

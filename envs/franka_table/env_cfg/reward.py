@@ -2,19 +2,13 @@ from __future__ import annotations
 from omni.isaac.orbit.utils import configclass
 from omni.isaac.orbit.managers import SceneEntityCfg
 from omni.isaac.orbit.managers import RewardTermCfg as RewTerm
-from omni.isaac.orbit.assets import RigidObject
 from omni.isaac.orbit.managers import SceneEntityCfg
-from omni.isaac.orbit.sensors import FrameTransformer
-from omni.isaac.orbit.utils.math import combine_frame_transforms
-from envs.franka_table import mdp
+from omni.isaac.orbit.envs import RLTaskEnv
 import torch
-from typing import TYPE_CHECKING
+
+from envs.franka_table import mdp
 from .success import SuccessCfg
 from .termination import TerminationsCfg
-
-
-if TYPE_CHECKING:
-    from omni.isaac.orbit.envs import RLTaskEnv
 
 
 def get_terminate_penalty(terminate_item):
@@ -42,7 +36,7 @@ def object_is_grasped(
     obs = env.obs_buf["observations"]
     cube_a_ee_distance = torch.norm(obs["cube_a_position"] - obs["ee_position"], dim=1)
     is_near_cube = torch.where(cube_a_ee_distance < 0.02, 1.0, 0.0)
-    encourage_close_reward = is_near_cube * (0.04 - obs["gripper_open_range"].squeeze())
+    encourage_close_reward = is_near_cube * (0.04 - obs["gripper_open_distance"].squeeze())
     return encourage_close_reward
 
 
@@ -57,11 +51,10 @@ def object_is_lifted(env: RLTaskEnv) -> torch.Tensor:
 
 @configclass
 class RewardsCfg:
-
-    success = SuccessCfg.success
-    terminate_1 = get_terminate_penalty(TerminationsCfg.cube_a_dropping)
-    terminate_2 = get_terminate_penalty(TerminationsCfg.cube_b_dropping)
-    terminate_3 = get_terminate_penalty(TerminationsCfg.plate_dropping)
+    success = SuccessCfg().success
+    terminate_1 = get_terminate_penalty(TerminationsCfg().cube_a_dropping)
+    terminate_2 = get_terminate_penalty(TerminationsCfg().cube_b_dropping)
+    terminate_3 = get_terminate_penalty(TerminationsCfg().plate_dropping)
 
     reaching_object = RewTerm(
         func=cube_a_ee_distance,

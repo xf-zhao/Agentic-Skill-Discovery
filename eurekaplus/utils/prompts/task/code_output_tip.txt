@@ -1,0 +1,6 @@
+The task candidates should be numbered one by one.
+Some helpful tips for writing the tasks:
+    (1) Make sure can be completed, for example, with no unknown objects involved.
+    (2) The success of the tasks should be measurable with current observations, e.g. object positions. The environment doesn't support collision detection yet. For simplicity, ignore collision.
+    (3) Use less objects in one atomic task.
+    (4) Make sure to not mention any joint positions as the task goal.

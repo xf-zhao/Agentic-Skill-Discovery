@@ -1,4 +1,5 @@
 import os
+import traceback
 import logging
 
 
@@ -13,5 +14,5 @@ for f in files:
         try:
             exec(f'from . import {f}')
         except Exception as e:
-            logging.info(e)
-
+            err_msg = traceback.format_exc()
+            logging.error(err_msg)

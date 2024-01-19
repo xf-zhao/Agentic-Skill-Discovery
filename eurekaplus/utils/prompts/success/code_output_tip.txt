@@ -1,0 +1,9 @@
+The output of the success function should reveal the success or not with values of either 1 or 0, respectively. Success functions are like sparse rewards that only examine the last status regarding success.
+The code output should be formatted as a python code string: "```python ... ```".
+
+Some helpful tips for writing the success function code:
+    (1) Make sure the type of each input variable is correctly specified; a float input variable should not be specified as torch.Tensor
+    (2) If there is any introduced hyper-parameters, make sure to assign them reasonable values by considering the size of objects. Recall the objects' actual size before your deduction.
+    (3) Most importantly, the reward code's input variables must contain only attributes of the provided environment class definition (namely, variables in the observation codes). Under no circumstance can you introduce new input variables.
+    (5) Be sure always conclude the whole codes finally in one code blocks for later extraction.
+    (6) Finally, configure the success discriminating function via `SuccessCfg` class, and make sure that the function for `func` is alreadly defined explictly.

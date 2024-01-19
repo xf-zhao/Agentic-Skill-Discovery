@@ -11,17 +11,18 @@ from omni.isaac.orbit.managers import TerminationTermCfg as DoneTerm
 from omni.isaac.orbit.assets import Articulation, RigidObject
 from omni.isaac.orbit.managers import SceneEntityCfg
 from omni.isaac.orbit.utils import configclass
-
-if TYPE_CHECKING:
-    from omni.isaac.orbit.envs import RLTaskEnv
+from omni.isaac.orbit.envs import RLTaskEnv
 
 
 def time_out(env: RLTaskEnv) -> torch.Tensor:
     """Terminate the episode when the episode length exceeds the maximum episode length."""
     return env.episode_length_buf >= env.max_episode_length
 
+
 def base_height(
-    env: RLTaskEnv, minimum_height: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+    env: RLTaskEnv,
+    minimum_height: float,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
     """Terminate when the asset's height is below the minimum height.
 
@@ -31,7 +32,6 @@ def base_height(
     # extract the used quantities (to enable type-hinting)
     asset: RigidObject = env.scene[asset_cfg.name]
     return asset.data.root_pos_w[:, 2] < minimum_height
-
 
 
 @configclass

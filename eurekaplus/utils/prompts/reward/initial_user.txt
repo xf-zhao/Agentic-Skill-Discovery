@@ -1,0 +1,5 @@
+The Python environment is 
+```python
+{task_obs_code_string}
+```
+Write a shaped reward function for the following task: {task_description}.

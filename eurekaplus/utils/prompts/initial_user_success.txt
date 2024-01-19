@@ -1,5 +1,0 @@
-The Python environment is 
-```python
-{task_obs_code_string}
-```
-Write a reward function for the following task: {task_description}.
