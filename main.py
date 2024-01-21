@@ -208,7 +208,6 @@ Please have a look.
 
 def gpt_call(
     messages,
-    feedbacks=None,
     model="gpt-3.5-turbo",
     n_samples=1,
     temperature=0,
@@ -217,14 +216,6 @@ def gpt_call(
     total_samples = 0
     total_completion_token = 0
     total_token = 0
-    if feedbacks is not None:
-        assert len(feedbacks) % 2 == 0
-        for i in range(0, len(feedbacks), 2):
-            conversation = [
-                {"role": "assitant", "content": feedbacks[i]},
-                {"role": "user", "content": feedbacks[i + 1]},
-            ]
-            messages.extend(conversation)
     for msg in messages:
         print(msg["content"])
 
@@ -341,14 +332,6 @@ class Node:
         )
         self.env_obs_code = self._extract_env_obs()
 
-    def _extract_env_obs(self):
-        env_obs_code_string = file_to_string(self.env_obs_file)
-        pattern = r"class MyObservationCfg.*:(.*?)def __post_init__.*"
-        code_string = re.search(pattern, env_obs_code_string, re.DOTALL)
-        if code_string is not None:
-            code_string = code_string.group(0).strip()
-        return code_string
-
     def init(self):
         self.idx = f"{self.type[0]}{uuid.uuid4().hex[:8]}"
         return self
@@ -371,24 +354,33 @@ class Node:
     def remove(self):
         raise NotImplementedError
 
+    def _extract_env_obs(self):
+        env_obs_code_string = file_to_string(self.env_obs_file)
+        pattern = r"class MyObservationCfg.*:(.*?)def __post_init__.*"
+        code_string = re.search(pattern, env_obs_code_string, re.DOTALL)
+        if code_string is not None:
+            code_string = code_string.group(0).strip()
+        return code_string
+
     def _loop_until_no_syntax_err(
         self,
         messages,
         response=None,
         replace_input=None,
         replace_output=None,
-        replacements={"RewTerm": "dict", "@configclass": "", "RLTaskEnv":"object"},
+        replacements={"RewTerm": "dict", "@configclass": "", "RLTaskEnv": "object"},
+        remove_temp=False,
     ):
         messages = messages.copy()
-        if response is None:
-            response, *_ = gpt_call(
-                messages=messages,
-                model=self.model,
-                n_samples=1,
-                temperature=0,
-            )[0]
         no_err = True
-        for __ in range(10):
+        for __ in range(5):
+            if response is None:
+                response, *_ = gpt_call(
+                    messages=messages,
+                    model=self.model,
+                    n_samples=1,
+                    temperature=0,
+                )[0]
             code = extract_code_string(
                 response=response,
                 replace_input=replace_input,
@@ -396,24 +388,37 @@ class Node:
             )
             for k, v in replacements.items():
                 code = code.replace(k, v)
-            # DOING HERE
-            tempfile.TemporaryFile()
             try:
-                exec(code)
-            except Exception as e:
+                with tempfile.NamedTemporaryFile(delete=False) as temp:
+                    temp.write(code.encode("utf-8"))
+                    logging.info(f"Examining syntax with temp file: {temp.name}...")
+                subprocess.check_output(["python", temp.name], stderr=subprocess.STDOUT)
+                if remove_temp:
+                    os.remove(temp.name)
+            except subprocess.CalledProcessError as e:
                 no_err = False
-                import traceback
-
-                err_msg = traceback.format_exc()
-                logging.error(err_msg)
+                traceback_msg = e.output.decode()
+                logging.warning(f"Temp syntax error found: {traceback_msg}")
                 err_feedback = self.execution_error_feedback.format(
-                    traceback_msg=err_msg
+                    traceback_msg=traceback_msg
                 )
-                messages.extend([response, err_feedback])
-
+                messages.extend([response, self._wrap_user_message(err_feedback)])
+                response = None
             if no_err:
                 break
-        return messages, response, code
+        return messages, response, code, no_err
+
+    def _wrap_system_message(self, content):
+        return self._wrap_message(content=content, role="system")
+
+    def _wrap_user_message(self, content):
+        return self._wrap_message(content=content, role="user")
+
+    def _wrap_assistant_message(self, content):
+        return self._wrap_message(content=content, role="assistant")
+
+    def _wrap_message(self, content, role="user"):
+        return {"role": role, "content": content}
 
 
 class RewardNode(Node):
@@ -633,8 +638,8 @@ class SuccessNode(Node):
             task_description=self.task_description,
         )
         self.messages = [
-            {"role": "system", "content": initial_system},
-            {"role": "user", "content": initial_user},
+            self._wrap_system_message(initial_system),
+            self._wrap_user_message(initial_user),
         ]
         return self
 
@@ -650,12 +655,14 @@ class SuccessNode(Node):
             logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
 
         for response in responses:
-            messages, response, code = self._loop_until_no_syntax_err(
+            messages, response, code, no_err = self._loop_until_no_syntax_err(
                 messages=self.messages,
                 response=response,
                 replace_input=REWARD_REPLACE_INPUT,
                 replace_output=REWARD_REPLACE_OUTPUT,
             )
+            if not no_err:
+                continue
             child = RewardNode()
             child.parent = self
             child.messages = messages
@@ -692,10 +699,7 @@ class SuccessNode(Node):
             if i != best_sample_idx:
                 child.remove()
         best_node.unlink()
-        feedback = {
-            "role": "user",
-            "content": self.summary["content"] + self.code_feedback,
-        }
+        feedback = self._wrap_user_message(self.summary["content"] + self.code_feedback)
         self.messages = [*best_node.messages, best_node.response, feedback]
         self.response = None
         self.ite += 1
@@ -760,9 +764,10 @@ class TaskNode(Node):
             task_description=self.code,
         )
         self.messages = [
-            {"role": "system", "content": initial_system},
-            {"role": "user", "content": initial_user},
+            self._wrap_system_message(initial_system),
+            self._wrap_user_message(initial_user),
         ]
+
         return self
 
     def propose(self) -> List[SuccessNode]:
@@ -776,19 +781,21 @@ class TaskNode(Node):
             logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
 
         for response in responses:
-            messages, response, code = self._loop_until_no_syntax_err(
+            messages, response, code, no_err = self._loop_until_no_syntax_err(
                 messages=self.messages,
                 response=response,
                 replace_input="weight=",
                 replace_output="weight=30.0 #",
             )
+            if not no_err:
+                continue
             child: SuccessNode = SuccessNode()
             child.parent = self
             child.message = messages
             child.response = response
             child.code = code
             child.init()
-            self.children.append(child)
+            self.add_child(child)
         return self.children
 
 
@@ -812,8 +819,8 @@ class EnvNode(Node):
             env_obs_code_string=self.env_obs_code,
         )
         self.messages = [
-            {"role": "system", "content": initial_system},
-            {"role": "user", "content": initial_user},
+            self._wrap_system_message(initial_system),
+            self._wrap_user_message(initial_user),
         ]
         return self
 
@@ -877,8 +884,8 @@ def main(cfg):
     env_name = cfg.env.env_name.lower()
     env_node = EnvNode(
         env_name=env_name,
-        # model="gpt-3.5-turbo",
-        model="gpt-4-1106-preview",
+        model="gpt-3.5-turbo",
+        # model="gpt-4-1106-preview",
         n_samples=1,
         temperature=0,
     ).init()
