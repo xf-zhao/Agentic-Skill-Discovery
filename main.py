@@ -397,12 +397,16 @@ class Node:
                     os.remove(temp.name)
             except subprocess.CalledProcessError as e:
                 no_err = False
-                traceback_msg = e.output.decode()
+                exec_msg = e.output.decode()
+                traceback_msg = filter_traceback(exec_msg)
+                assert traceback_msg != ""
                 logging.warning(f"Temp syntax error found: {traceback_msg}")
                 err_feedback = self.execution_error_feedback.format(
                     traceback_msg=traceback_msg
                 )
-                messages.extend([response, self._wrap_user_message(err_feedback)])
+                messages.extend(
+                    [response["message"], self._wrap_user_message(err_feedback)]
+                )
                 response = None
             if no_err:
                 break
@@ -700,7 +704,7 @@ class SuccessNode(Node):
                 child.remove()
         best_node.unlink()
         feedback = self._wrap_user_message(self.summary["content"] + self.code_feedback)
-        self.messages = [*best_node.messages, best_node.response, feedback]
+        self.messages = [*best_node.messages, best_node.response["message"], feedback]
         self.response = None
         self.ite += 1
 
@@ -720,7 +724,9 @@ class SuccessNode(Node):
         )
         logging.info(f"Iteration {self.ite}: Best Generation ID: {best_sample_idx}")
         logging.info(
-            f"Iteration {self.ite}: GPT Output Content:\n" + best_node.response + "\n"
+            f"Iteration {self.ite}: GPT Output Content:\n"
+            + best_node.response["message"]["content"]
+            + "\n"
         )
         logging.info(
             f"Iteration {self.ite}: User Content:\n"
