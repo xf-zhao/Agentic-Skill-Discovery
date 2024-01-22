@@ -1,23 +1,29 @@
-def is_object_out_of_table(
-    env: RLTaskEnv, minimum_height: float,
-) -> torch.Tensor:
-    """Terminate when the asset's height is below the minimum height.
-
-    Note:
-        This is currently only supported for flat terrains, i.e. the minimum height is in the world frame.
-    """
+def cube_a_is_lifted(env: RLTaskEnv) -> torch.Tensor:
+    """Reward the agent for lifting the object above the minimal height."""
     obs = env.obs_buf["observations"]
-    asset_height = obs['plate_position'][:, 2] # x, y, z (height)
-    return asset_height < minimum_height
+    minimal_height = 0.06 # self-contained hyper-parameters
+    cube_a_height = obs["cube_a_position"][:, 2]
+    lifted_reward = torch.where(cube_a_height > minimal_height, 1.0, 0.0)
+    return lifted_reward
+
+def cube_a_is_grasped(env: RLTaskEnv) -> torch.Tensor:
+    """Reward the agent for grasping the object"""
+    obs = env.obs_buf["observations"]
+    cube_a_ee_distance = torch.norm(obs['cube_a_position'] - obs["ee_position"], dim=1)
+    is_near_cube = torch.where(cube_a_ee_distance < 0.02, 1.0, 0.0)
+    encourage_close_reward = is_near_cube * (0.04 - obs["gripper_open_distance"].squeeze())
+    return encourage_close_reward
 
 
 @configclass
 class RewardsCfg:
-    # The first reward component to avoid falling object
-    dropping_plate = RewTerm(
+    # The first reward component to encourage grasping
+    cube_a_grasped = RewTerm(
         func=is_object_out_of_table,
-        params={"minimum_height": -0.05}, # Table plane as z = 0
-        weight=-10.0, # Negative reward weight for penalizing the falling of an object
-    )
+        weight=25.0,
+    ) 
 
     # It is encouraged to have more reward components. (They should be with distinguish names)
+    cube_a_lifted = RewTerm(func=cube_a_is_lifted, weight=10.0)
+
+    # ... and more shaped rewarding components towards faster reinforcement learning

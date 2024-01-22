@@ -91,10 +91,10 @@ REWARD_REPLACE_OUTPUT = """
 @configclass
 class RewardsCfg:
 
-    success = SuccessCfg.success
-    terminate_1 = get_terminate_penalty(TerminationsCfg.cube_a_dropping)
-    terminate_2 = get_terminate_penalty(TerminationsCfg.cube_b_dropping)
-    terminate_3 = get_terminate_penalty(TerminationsCfg.plate_dropping)
+    success = SuccessCfg().success
+    terminate_1 = get_terminate_penalty(TerminationsCfg().cube_a_dropping)
+    terminate_2 = get_terminate_penalty(TerminationsCfg().cube_b_dropping)
+    terminate_3 = get_terminate_penalty(TerminationsCfg().plate_dropping)
 
 """
 
@@ -126,7 +126,7 @@ class TerminationsCfg:
 """
 
 FAKE_LLM_REWARD = """
-I have to think ...
+I have to think ..
 
 Here is the reward function.
 
@@ -254,7 +254,7 @@ def gpt_call(
     return responses, total_samples, total_completion_token, total_token
 
 
-def extract_code_string(response, replace_input=None, replace_output=None):
+def extract_code_string(response):
     patterns = [
         r"```python(.*?)```",
         r"```(.*?)```",
@@ -270,34 +270,13 @@ def extract_code_string(response, replace_input=None, replace_output=None):
             code_string = code_string[-1].strip()
             break
     code_string = content if not code_string else code_string
-    if replace_input is not None and replace_output is not None:
-        code_string = code_string.replace(replace_input, replace_output)
     return code_string
-
-
-def syntax_examine(codes, replacements={"RewTerm": "dict", "@configclass": ""}):
-    err_msgs = [None] * len(codes)
-    syntax_pass = [True] * len(codes)
-    for i, code in enumerate(codes):
-        for k, v in replacements.items():
-            code = code.replace(k, v)
-        try:
-            exec(code)
-        except Exception as e:
-            import traceback
-
-            err_msg = traceback.format_exc()
-            logging.error(err_msg)
-            err_msgs[i] = err_msg
-            syntax_pass[i] = False
-    return err_msgs, syntax_pass
 
 
 class Node:
     def __init__(
         self,
-        parent=None,
-        message=None,
+        messages=None,
         response=None,
         code=None,
         root_dir=None,
@@ -310,14 +289,14 @@ class Node:
         self.prompt_dir = f"{self.root_dir}/eurekaplus/utils/prompts"
         self.env_name = env_name
         self.type = None
+        self.parent = None
         self.children = []
         self.runable = False
         self.model = model
         self.n_samples = n_samples
         self.temperature = temperature
         self.idx = None
-        self.parent = parent
-        self.messages = message
+        self.messages = messages
         self.response = response
         self.code = code
         self.summary = None
@@ -337,6 +316,7 @@ class Node:
         return self
 
     def add_child(self, child):
+        child.parent = self
         self.children.append(child)
 
     def propose(self):
@@ -362,18 +342,9 @@ class Node:
             code_string = code_string.group(0).strip()
         return code_string
 
-    def _loop_until_no_syntax_err(
-        self,
-        messages,
-        response=None,
-        replace_input=None,
-        replace_output=None,
-        replacements={"RewTerm": "dict", "@configclass": "", "RLTaskEnv": "object"},
-        remove_temp=False,
-    ):
+    def _loop_until_no_syntax_err(self, messages, response=None, replacements={}):
         messages = messages.copy()
-        no_err = True
-        for __ in range(5):
+        for _ in range(5):
             if response is None:
                 response, *_ = gpt_call(
                     messages=messages,
@@ -381,36 +352,49 @@ class Node:
                     n_samples=1,
                     temperature=0,
                 )[0]
-            code = extract_code_string(
-                response=response,
-                replace_input=replace_input,
-                replace_output=replace_output,
-            )
-            for k, v in replacements.items():
-                code = code.replace(k, v)
-            try:
-                with tempfile.NamedTemporaryFile(delete=False) as temp:
-                    temp.write(code.encode("utf-8"))
-                    logging.info(f"Examining syntax with temp file: {temp.name}...")
-                subprocess.check_output(["python", temp.name], stderr=subprocess.STDOUT)
-                if remove_temp:
-                    os.remove(temp.name)
-            except subprocess.CalledProcessError as e:
-                no_err = False
-                exec_msg = e.output.decode()
-                traceback_msg = filter_traceback(exec_msg)
-                assert traceback_msg != ""
-                logging.warning(f"Temp syntax error found: {traceback_msg}")
-                err_feedback = self.execution_error_feedback.format(
-                    traceback_msg=traceback_msg
-                )
+            code = extract_code_string(response=response)
+            no_err, err_feedback = self._syntax_examine(code)
+            if not no_err:
                 messages.extend(
                     [response["message"], self._wrap_user_message(err_feedback)]
                 )
                 response = None
-            if no_err:
+            else:
+                for k, v in replacements.items():
+                    code = code.replace(k, v)
                 break
         return messages, response, code, no_err
+
+    def _syntax_examine(
+        self,
+        code: str,
+        replacements={"RewTerm": "dict", "@configclass": "", "RLTaskEnv": "object"},
+        prefix_codes="import torch\n\n",
+        remove_temp=False,
+    ):
+        err_feedback = None
+        for k, v in replacements.items():
+            code = code.replace(k, v)
+        try:
+            with tempfile.NamedTemporaryFile(delete=False) as temp:
+                code = prefix_codes + code
+                temp.write(code.encode("utf-8"))
+                logging.info(f"Examining syntax with temp file: {temp.name}...")
+            subprocess.check_output(["python", temp.name], stderr=subprocess.STDOUT)
+            if remove_temp:
+                os.remove(temp.name)
+            no_err = True
+            logging.info(f"No syntax error, continue to build graph.")
+        except subprocess.CalledProcessError as e:
+            exec_msg = e.output.decode()
+            traceback_msg = filter_traceback(exec_msg)
+            assert traceback_msg != ""
+            logging.warning(f"Temp syntax error found: {traceback_msg}, loop to fix.")
+            err_feedback = self.execution_error_feedback.format(
+                traceback_msg=traceback_msg
+            )
+            no_err = False
+        return no_err, err_feedback
 
     def _wrap_system_message(self, content):
         return self._wrap_message(content=content, role="system")
@@ -426,9 +410,10 @@ class Node:
 
 
 class RewardNode(Node):
-    def __init__(self, num_envs=11, *args, **kwargs) -> None:
+    def __init__(self, num_envs=11, task=None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Reward"
+        self.task = task
         self.runable = True
         self.ite = 1
         self.num_envs = num_envs
@@ -444,7 +429,11 @@ class RewardNode(Node):
 
     def init(self):
         super().init()
-        cur_env_dir = self.cur_env_dir
+        cur_env_dir = f"{self.root_dir}/envs_gpt/{self.env_name}/{self.idx}"
+        self.rl_filepath = (
+            f"{self.parent.parent.idx}-{self.parent.idx}-{self.idx}-{self.ite}.txt"
+        )
+        self.cur_env_dir = cur_env_dir
         if os.path.exists(cur_env_dir):
             os.removedirs(cur_env_dir)
             logging.info(f"Remove directory {cur_env_dir}.")
@@ -460,23 +449,18 @@ class RewardNode(Node):
         with open(success_file, "w") as file:
             file.write(SUCCESS_INIT)
             file.writelines(self.parent.code + "\n")
-        return self
 
-    def refresh(self):
-        cur_env_dir = self.cur_env_dir
-        self.rl_filepath = (
-            f"{self.parent.parent.idx}-{self.parent.idx}-{self.idx}-{self.ite}.txt"
-        )
         reward_file = f"{cur_env_dir}/reward.py"
         with open(reward_file, "w") as file:
             file.write(REWARD_INIT)
             file.writelines(self.code + "\n")
+
         return self
 
     def unlink(self):
         # self.parent.children.pop(self's index)
         self.parent = None
-        self.children = None
+        self.children = []
         return
 
     def remove(self):
@@ -529,6 +513,7 @@ class RewardNode(Node):
                     logging.info(
                         f"Iteration {self.ite}: Code Run {self.idx} execution error!"
                     )
+                logging.info(f"Log at {self.rl_filepath}")
                 break
         return
 
@@ -615,9 +600,10 @@ class RewardNode(Node):
 
 
 class SuccessNode(Node):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, task=None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Success"
+        self.task = task
         self.initial_system = file_to_string(
             f"{self.prompt_dir}/reward/initial_system.txt"
         )
@@ -633,13 +619,14 @@ class SuccessNode(Node):
         self.max_reward_idx = None
 
     def init(self):
+        super().init()
         initial_system = (
             self.initial_system.format(signature_string=self.signature)
             + self.code_output_tip
         )
         initial_user = self.initial_user.format(
             task_obs_code_string=self.env_obs_code,
-            task_description=self.task_description,
+            task_description=self.task.code,
         )
         self.messages = [
             self._wrap_system_message(initial_system),
@@ -647,8 +634,8 @@ class SuccessNode(Node):
         ]
         return self
 
-    def propose(self) -> List[RewardNode]:
-        self.children = List[RewardNode]
+    def propose(self, num_envs=2048) -> List[RewardNode]:
+        self.children: List[RewardNode] = []
         responses, *_ = gpt_call(
             messages=self.messages,
             model=self.model,
@@ -662,23 +649,23 @@ class SuccessNode(Node):
             messages, response, code, no_err = self._loop_until_no_syntax_err(
                 messages=self.messages,
                 response=response,
-                replace_input=REWARD_REPLACE_INPUT,
-                replace_output=REWARD_REPLACE_OUTPUT,
+                replacements={REWARD_REPLACE_INPUT: REWARD_REPLACE_OUTPUT},
             )
             if not no_err:
                 continue
-            child = RewardNode()
-            child.parent = self
-            child.messages = messages
-            child.response = response
-            child.code = code
+            child = RewardNode(
+                num_envs=num_envs,
+                task=self.task,
+                messages=messages,
+                response=response,
+                code=code,
+            )
+            self.add_child(child)
             child.init()
-            self.children.append(child)
         return self.children
 
     def collect(self):
         for child in self.children:
-            child = RewardNode()
             child.summarize()
         exec_successes = [child.summary["exec_success"] for child in self.children]
         any_success = np.sum(exec_successes) > 0
@@ -761,6 +748,7 @@ class TaskNode(Node):
         )
 
     def init(self):
+        super().init()
         initial_system = (
             self.initial_system.format(signature_string=self.signature)
             + self.code_output_tip
@@ -790,18 +778,15 @@ class TaskNode(Node):
             messages, response, code, no_err = self._loop_until_no_syntax_err(
                 messages=self.messages,
                 response=response,
-                replace_input="weight=",
-                replace_output="weight=30.0 #",
+                replacements={"weight=": "weight=30.0, #"},
             )
             if not no_err:
                 continue
-            child: SuccessNode = SuccessNode()
-            child.parent = self
-            child.message = messages
-            child.response = response
-            child.code = code
-            child.init()
+            child: SuccessNode = SuccessNode(
+                task=self, messages=messages, response=response, code=code
+            )
             self.add_child(child)
+            child.init()
         return self.children
 
 
@@ -820,6 +805,7 @@ class EnvNode(Node):
         )
 
     def init(self):
+        super().init()
         initial_system = self.initial_system + self.code_output_tip
         initial_user = self.initial_user.format(
             env_obs_code_string=self.env_obs_code,
@@ -848,9 +834,9 @@ Task 10: Pick up Cube B and place it on top of Cube A.
 
         for task in tasks:
             code = task.split(": ")[-1]
-            child: TaskNode = TaskNode(parent=self, code=code)
-            child.init()
+            child: TaskNode = TaskNode(code=code)
             self.add_child(child)
+            child.init()
         return self.children
 
     def propose(self) -> List[TaskNode]:
@@ -868,9 +854,9 @@ Task 10: Pick up Cube B and place it on top of Cube A.
         tasks = re.findall(pattern, content)
         for task in tasks:
             code = task.split(": ")[-1]
-            child: TaskNode = TaskNode(parent=self, code=code)
-            child.init()
+            child: TaskNode = TaskNode(code=code)
             self.add_child(child)
+            child.init()
         return self.children
 
 
@@ -888,6 +874,7 @@ def main(cfg):
     logging.info("Env description: " + env_description)
 
     env_name = cfg.env.env_name.lower()
+    num_envs = 11 if cfg.debug else cfg.num_envs
     env_node = EnvNode(
         env_name=env_name,
         model="gpt-3.5-turbo",
@@ -895,8 +882,8 @@ def main(cfg):
         n_samples=1,
         temperature=0,
     ).init()
-    # task_nodes = env_node.propose_fake()
-    task_nodes = env_node.propose()
+    task_nodes = env_node.propose_fake()
+    # task_nodes = env_node.propose()
     for task_node in task_nodes:
         break
 
@@ -914,7 +901,7 @@ def main(cfg):
         # Success condition function
         success_nodes = task_node.propose()
         for success_node in success_nodes:
-            reward_nodes = success_node.propose()
+            reward_nodes = success_node.propose(num_envs=num_envs)
             for node in reward_nodes:
                 node.run()
             any_success, stat = success_node.collect()

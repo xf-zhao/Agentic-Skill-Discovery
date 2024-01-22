@@ -40,12 +40,9 @@ class ObservationsCfg:
             func=mdp.drawer_position_in_robot_root_frame,
             params={"asset_cfg": SceneEntityCfg("cabinet")},
         )
-        specific_target_position_on_table = ObsTerm(
-            func=mdp.generated_commands, params={"command_name": "specific_target_position_on_table"}
+        target_pose_on_table = ObsTerm(
+            func=mdp.generated_commands, params={"command_name": "target_pose_on_table"}
         )
-        # specific_target_position_above_table = ObsTerm(
-        #     func=mdp.generated_commands, params={"command_name": "specific_target_position_above_table"}
-        # )
         actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
@@ -63,7 +60,7 @@ class ObservationsCfg:
             - Two cubes with the same size but different appearance and id (cube A and cube B). The cubes' edge length are both 0.08 meter. The positions of cubes are randomly initialized within the table range every reset.
             - One rounded plate, with a radius of 0.1 meter. The position of the plate is randomly initialized every time of reset within the table range.
             - The robot gripper is initially open. It is bigger than the cubes but smaller than plates and the drawer.
-            - The variable `target_position_on_table` indicates a specific target position on the table, which is meant for goal-conditioned policy learning. Also use this one instead of coming up with a new variable.
+            - The variable `target_pose_on_table` indicates a specific target position on the table, which is meant for goal-conditioned policy learning. Also use this one instead of coming up with a new variable. This pose variable contains 3 position and 4 quaternions.
 
         """
 
@@ -109,9 +106,10 @@ class ObservationsCfg:
             params={"asset_cfg": SceneEntityCfg("cabinet")},
         )
 
-        # Randomly initialized position on the table surface as target position to play with
-        target_position_on_table = ObsTerm(
-            func=mdp.generated_commands, params={"command_name": "specific_target_position_on_table"}
+        # Randomly initialized target pose to play with. It is in the shape of (num_envs, 7).
+        # Later use `env.observations['target_pose_on_table'][:, :3]` for position and `env.observations['target_pose_on_table'][:, 3:]` for quatenion orentation inside the function computation.
+        target_pose_on_table = ObsTerm(
+            func=mdp.generated_commands, params={"command_name": "target_pose_on_table"}
         )
 
         # the last action the robot has taken

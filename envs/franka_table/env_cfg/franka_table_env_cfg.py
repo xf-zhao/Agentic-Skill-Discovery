@@ -204,7 +204,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
 class CommandsCfg:
     """Command terms for the MDP."""
 
-    specific_target_position_on_table = mdp.UniformPoseCommandCfg(
+    target_pose_on_table = mdp.UniformPoseCommandCfg(
         asset_name="robot",
         body_name=MISSING,  # will be set by agent env cfg
         resampling_time_range=(5.0, 5.0),
@@ -367,7 +367,7 @@ class FrankaTableEnvCfg(FrankaTablePlayEnvCfg):
             close_command_expr={"panda_finger_.*": 0.0},
         )
         # Set the body name for the end effector
-        self.commands.object_pose.body_name = "panda_hand"
+        self.commands.target_pose_on_table.body_name = "panda_hand"
 
         # Listens to the required transforms
         marker_cfg = FRAME_MARKER_CFG.copy()
