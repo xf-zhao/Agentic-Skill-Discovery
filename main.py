@@ -300,6 +300,7 @@ class Node:
         self.response = response
         self.code = code
         self.summary = None
+        self.ite = 1
         self.env_file = (
             f"{self.root_dir}/envs/{self.env_name}/env_cfg/{self.env_name}_env_cfg.py"
         )
@@ -415,7 +416,6 @@ class RewardNode(Node):
         self.type = "Reward"
         self.task = task
         self.runable = True
-        self.ite = 1
         self.num_envs = num_envs
         self.rl_run = None
         self.rl_filepath = None
@@ -521,12 +521,11 @@ class RewardNode(Node):
         self.rl_run.communicate()
         exec_success = False
         content = ""
-        success, correlation = DUMMY_FAILURE, DUMMY_FAILURE
+        success = DUMMY_FAILURE
         summary = {
             "exec_success": exec_success,
             "content": content,
             "success": success,
-            "correlation": correlation,
         }
 
         try:
@@ -542,59 +541,45 @@ class RewardNode(Node):
         if traceback_msg == "":
             # If RL execution has no error, provide policy statistics feedback
             exec_success = True
+            success_reward_key = 'Episode Reward'
             lines = stdout_str.split("\n")
             for i, line in enumerate(lines):
-                if line.startswith("Tensorboard Directory:"):
+                if line.startswith("Log Directory:"):
                     break
             tensorboard_logdir = line.split(":")[-1].strip()
             tensorboard_logs = load_tensorboard_logs(tensorboard_logdir)
-            max_iterations = np.array(tensorboard_logs["gt_reward"]).shape[0]
+            max_iterations = np.array(tensorboard_logs[success_reward_key]).shape[0]
             epoch_freq = max(int(max_iterations // 10), 1)
 
             content += self.policy_feedback.format(epoch_freq=epoch_freq)
 
-            # Compute Correlation between Human-Engineered and GPT Rewards
-            if "gt_reward" in tensorboard_logs and "gpt_reward" in tensorboard_logs:
-                gt_reward = np.array(tensorboard_logs["gt_reward"])
-                gpt_reward = np.array(tensorboard_logs["gpt_reward"])
-                correlation = np.corrcoef(gt_reward, gpt_reward)[0, 1]
-
             # Add reward components log to the feedback
             for metric in tensorboard_logs:
-                if "/" not in metric:
+                if metric.startswith('Episode Reward/') and '/terminate_' not in metric:
                     metric_cur = [
                         "{:.2f}".format(x)
                         for x in tensorboard_logs[metric][::epoch_freq]
                     ]
                     metric_cur_max = max(tensorboard_logs[metric])
+                    metric_cur_min = min(tensorboard_logs[metric])
                     metric_cur_mean = sum(tensorboard_logs[metric]) / len(
                         tensorboard_logs[metric]
                     )
-                    if "consecutive_successes" == metric:
+                    if success_reward_key == metric:
                         success = metric_cur_max
-                    metric_cur_min = min(tensorboard_logs[metric])
-                    if metric != "gt_reward" and metric != "gpt_reward":
-                        if metric != "consecutive_successes":
-                            metric_name = metric
-                        else:
-                            metric_name = "task_score"
-                        content += f"{metric_name}: {metric_cur}, Max: {metric_cur_max:.2f}, Mean: {metric_cur_mean:.2f}, Min: {metric_cur_min:.2f} \n"
+                        metric_name = f'Reward component `{metric}`'
                     else:
-                        # Provide ground-truth score when success rate not applicable
-                        if "consecutive_successes" not in tensorboard_logs:
-                            content += f"ground-truth score: {metric_cur}, Max: {metric_cur_max:.2f}, Mean: {metric_cur_mean:.2f}, Min: {metric_cur_min:.2f} \n"
-            content += self.code_feedback
+                        metric_name = "Success score"
+                        content += f"{metric_name}: {metric_cur}, Max: {metric_cur_max:.2f}, Mean: {metric_cur_mean:.2f}, Min: {metric_cur_min:.2f} \n"
         else:
             # Otherwise, provide execution traceback error feedback
             success = DUMMY_FAILURE
-            correlation = DUMMY_FAILURE
             content += self.execution_error_feedback.format(traceback_msg=traceback_msg)
 
         summary = {
             "exec_success": exec_success,
             "content": content,
             "success": success,
-            "correlation": correlation,
         }
         return summary
 
@@ -611,6 +596,9 @@ class SuccessNode(Node):
         self.signature = file_to_string(f"{self.prompt_dir}/reward/signature.txt")
         self.execution_error_feedback = file_to_string(
             f"{self.prompt_dir}/reward/execution_error_feedback.txt"
+        )
+        self.code_feedback = file_to_string(
+            f"{self.prompt_dir}/reward/code_feedback.txt"
         )
         self.code_output_tip = file_to_string(
             f"{self.prompt_dir}/reward/code_output_tip.txt"
@@ -674,7 +662,6 @@ class SuccessNode(Node):
             stat = {
                 "execute_rate": 0.0,
                 "max_success": DUMMY_FAILURE,
-                "max_success_reward_correlation": DUMMY_FAILURE,
                 "max_reward_idx": None,
             }
             logging.info(
@@ -690,24 +677,23 @@ class SuccessNode(Node):
             if i != best_sample_idx:
                 child.remove()
         best_node.unlink()
-        feedback = self._wrap_user_message(self.summary["content"] + self.code_feedback)
+        self.children = []
+        feedback = self._wrap_user_message(best_node.summary["content"] + self.code_feedback)
         self.messages = [*best_node.messages, best_node.response["message"], feedback]
         self.response = None
         self.ite += 1
 
         # some statistic report
         max_success = best_node.summary["success"]
-        max_success_reward_correlation = best_node.summary["correlation"]
         execute_rate = np.sum(np.array(successes) >= 0.0) / self.n_samples
 
         # Update the best Eureka Output
         if max_success > self.max_success_overall:
             self.max_success_overall = max_success
-            # self.max_success_reward_correlation_overall = max_success_reward_correlation
             self.max_reward_idx = best_node.idx
 
         logging.info(
-            f"Iteration {self.ite}: Max Success: {max_success}, Execute Rate: {execute_rate}, Max Success Reward Correlation: {max_success_reward_correlation}"
+            f"Iteration {self.ite}: Max Success: {max_success}, Execute Rate: {execute_rate}"
         )
         logging.info(f"Iteration {self.ite}: Best Generation ID: {best_sample_idx}")
         logging.info(
@@ -723,7 +709,6 @@ class SuccessNode(Node):
         stat = {
             "execute_rate": execute_rate,
             "max_success": max_success,
-            "max_success_reward_correlation": max_success_reward_correlation,
             "max_reward_idx": self.max_reward_idx,
         }
         return any_success, stat
@@ -745,6 +730,9 @@ class TaskNode(Node):
         )
         self.execution_error_feedback = file_to_string(
             f"{self.prompt_dir}/success/execution_error_feedback.txt"
+        )
+        self.code_feedback = file_to_string(
+            f"{self.prompt_dir}/success/code_feedback.txt"
         )
 
     def init(self):
@@ -867,11 +855,9 @@ def main(cfg):
     logging.info(f"Project Root: {ZEROHERO_ROOT_DIR}")
     openai.api_key = os.getenv("OPENAI_API_KEY")
     env = cfg.env
-    env_description = cfg.env.description
     model = cfg.model
     logging.info(f"Using LLM: {model}")
     logging.info("Env: " + env.env_name)
-    logging.info("Env description: " + env_description)
 
     env_name = cfg.env.env_name.lower()
     num_envs = 11 if cfg.debug else cfg.num_envs
@@ -889,7 +875,6 @@ def main(cfg):
 
     stats = {
         "max_success": [],
-        "max_success_reward_correlation": [],
         "execute_rate": [],
         "max_reward_idx": [],
     }
@@ -917,7 +902,6 @@ def main(cfg):
         max_successes = stats["max_success"]
         execute_rates = stats["execute_rate"]
         max_reward_idxs = stats["max_reward_idx"]
-        max_successes_reward_correlation = stats["max_success_reward_correlation"]
 
         x_axis = np.arange(len(max_successes))
         axs[0].plot(x_axis, np.array(max_successes))
@@ -933,7 +917,6 @@ def main(cfg):
             max_successes=max_successes,
             execute_rates=execute_rates,
             max_reward_idx=max_reward_idxs,
-            max_successes_reward_correlation=max_successes_reward_correlation,
         )
 
     # # Evaluate the best reward code many times

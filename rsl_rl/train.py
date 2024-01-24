@@ -118,6 +118,7 @@ def main():
     if agent_cfg.run_name:
         log_dir += f"_{agent_cfg.run_name}"
     log_dir = os.path.join(log_root_path, log_dir)
+    print(f'Log Directory: {log_dir}')
 
     # create isaac environment
     env = gym.make(

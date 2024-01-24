@@ -1,4 +1,4 @@
-def cube_a_is_lifted(env: RLTaskEnv, minimal_height: float) -> torch.Tensor:
+def cube_a_is_lifted(env: RLTaskEnv) -> torch.Tensor:
     """Sparse reward the agent for lifting cube A above a great height."""
     minimal_height = 0.3 # hyper-parameters should be self-contained.
     obs = env.obs_buf["observations"]
