@@ -280,6 +280,7 @@ class Node:
         response=None,
         code=None,
         root_dir=None,
+        iterations = 1,
         env_name="franka_table",
         model="gpt-3.5-turbo",
         n_samples=1,
@@ -291,6 +292,7 @@ class Node:
         self.type = None
         self.parent = None
         self.children = []
+        self.iterations = iterations
         self.runable = False
         self.model = model
         self.n_samples = n_samples
@@ -605,6 +607,11 @@ class SuccessNode(Node):
         )
         self.max_success_overall = DUMMY_FAILURE
         self.max_reward_idx = None
+        self.stats = {
+        "max_success": [],
+        "execute_rate": [],
+        "max_reward_idx": [],
+        }
 
     def init(self):
         super().init()
@@ -621,6 +628,7 @@ class SuccessNode(Node):
             self._wrap_user_message(initial_user),
         ]
         return self
+
 
     def propose(self, num_envs=2048) -> List[RewardNode]:
         self.children: List[RewardNode] = []
@@ -681,7 +689,6 @@ class SuccessNode(Node):
         feedback = self._wrap_user_message(best_node.summary["content"] + self.code_feedback)
         self.messages = [*best_node.messages, best_node.response["message"], feedback]
         self.response = None
-        self.ite += 1
 
         # some statistic report
         max_success = best_node.summary["success"]
@@ -706,13 +713,48 @@ class SuccessNode(Node):
             + best_node.summary["content"]
             + "\n"
         )
+        self.ite += 1
+        self._collect_stat(execute_rate, max_success, self.max_reward_idx)
+        return any_success, stat
+
+
+
+    def analyze_stats(self):
+        stats = self.stats
+        # Plot the success rate
+        fig, axs = plt.subplots(2, figsize=(6, 6))
+        fig.suptitle(f"{self.task.code}")
+
+        max_successes = stats["max_success"]
+        execute_rates = stats["execute_rate"]
+        max_reward_idxs = stats["max_reward_idx"]
+
+        x_axis = np.arange(len(max_successes))
+        axs[0].plot(x_axis, np.array(max_successes))
+        axs[0].set_title("Max Success")
+        axs[0].set_xlabel("Iteration")
+        axs[1].plot(x_axis, np.array(execute_rates))
+        axs[1].set_title("Execute Rate")
+        axs[1].set_xlabel("Iteration")
+        fig.tight_layout(pad=3.0)
+        plt.savefig("summary.png")
+        np.savez(
+            "summary.npz",
+            max_successes=max_successes,
+            execute_rates=execute_rates,
+            max_reward_idx=max_reward_idxs,
+        )
+        return
+
+    def _collect_stat(self, execute_rate, max_success, max_reward_idx):
         stat = {
             "execute_rate": execute_rate,
             "max_success": max_success,
-            "max_reward_idx": self.max_reward_idx,
+            "max_reward_idx": max_reward_idx,
         }
-        return any_success, stat
-
+        for k, v in stat.items():
+            self.stats[k].append(v)
+        return
 
 class TaskNode(Node):
     def __init__(self, *args, **kwargs) -> None:
@@ -752,7 +794,7 @@ class TaskNode(Node):
 
         return self
 
-    def propose(self) -> List[SuccessNode]:
+    def propose(self, iterations=3, n_samples=3) -> List[SuccessNode]:
         responses, *_ = gpt_call(
             messages=self.messages,
             model=self.model,
@@ -771,7 +813,7 @@ class TaskNode(Node):
             if not no_err:
                 continue
             child: SuccessNode = SuccessNode(
-                task=self, messages=messages, response=response, code=code
+                task=self, messages=messages, response=response, code=code, iterations=iterations, n_samples=n_samples
             )
             self.add_child(child)
             child.init()
@@ -873,51 +915,19 @@ def main(cfg):
     for task_node in task_nodes:
         break
 
-    stats = {
-        "max_success": [],
-        "execute_rate": [],
-        "max_reward_idx": [],
-    }
-
     # Eureka generation loop
-    for ite in range(cfg.iteration):
-        logging.info(f"Iteration {ite}: Generating with {cfg.model}")
+    for i in range(cfg.iteration):
+        logging.info(f"Iteration {i}: Generating with {cfg.model}")
 
-        # Success condition function
-        success_nodes = task_node.propose()
+        success_nodes = task_node.propose(iterations=3, n_samples=3)
         for success_node in success_nodes:
-            reward_nodes = success_node.propose(num_envs=num_envs)
-            for node in reward_nodes:
-                node.run()
-            any_success, stat = success_node.collect()
-            for k, v in stat.items():
-                stats[k].append(v)
-            if not any_success:
-                continue
+            for _ in range(success_node.iterations):
+                reward_nodes = success_node.propose(num_envs=num_envs)
+                for node in reward_nodes:
+                    print(f'Fake run node: {node.idx}.')
+                    # node.run()
+                # success_node.collect()
 
-        # Plot the success rate
-        fig, axs = plt.subplots(2, figsize=(6, 6))
-        fig.suptitle(f"{cfg.env.task}")
-
-        max_successes = stats["max_success"]
-        execute_rates = stats["execute_rate"]
-        max_reward_idxs = stats["max_reward_idx"]
-
-        x_axis = np.arange(len(max_successes))
-        axs[0].plot(x_axis, np.array(max_successes))
-        axs[0].set_title("Max Success")
-        axs[0].set_xlabel("Iteration")
-        axs[1].plot(x_axis, np.array(execute_rates))
-        axs[1].set_title("Execute Rate")
-        axs[1].set_xlabel("Iteration")
-        fig.tight_layout(pad=3.0)
-        plt.savefig("summary.png")
-        np.savez(
-            "summary.npz",
-            max_successes=max_successes,
-            execute_rates=execute_rates,
-            max_reward_idx=max_reward_idxs,
-        )
 
     # # Evaluate the best reward code many times
     # # if max_reward_idxs is None:
