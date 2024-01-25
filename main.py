@@ -426,7 +426,7 @@ class RewardNode(Node):
         task=None,
         headless=False,
         memory_requirement=16,
-        max_iterations = 2000,
+        max_iterations=2000,
         *args,
         **kwargs,
     ) -> None:
@@ -505,7 +505,7 @@ class RewardNode(Node):
                 break
             else:
                 if i % 60 == 0:
-                    logging.info(f'')
+                    logging.info(f"")
                     logging.info(
                         f"Available mem: {available_mem}. (Require {self.memory_requirement}). Waiting for enough mem to run node {self.parent.parent.idx}-{self.parent.idx}-{self.idx}. Time elapsed: {i//6} minutes."
                     )
@@ -525,7 +525,7 @@ class RewardNode(Node):
             "--num_envs",
             f"{self.num_envs}",
             "--max_iterations",
-            f'{self.max_iterations}'
+            f"{self.max_iterations}",
         ]
         if self.headless:
             rl_run_command.append("--headless")
@@ -673,7 +673,7 @@ class SuccessNode(Node):
         return self
 
     def propose(
-        self, num_envs=2048,max_iterations=2000, headless=False, memory_requirement=10
+        self, num_envs=2048, max_iterations=2000, headless=False, memory_requirement=10
     ) -> List[RewardNode]:
         self.children: List[RewardNode] = []
         responses, *_ = gpt_call(
@@ -689,7 +689,10 @@ class SuccessNode(Node):
             messages, response, code, no_err = self._loop_until_no_syntax_err(
                 messages=self.messages,
                 response=response,
-                replacements={REWARD_REPLACE_INPUT: REWARD_REPLACE_OUTPUT},
+                replacements={
+                    REWARD_REPLACE_INPUT: REWARD_REPLACE_OUTPUT,
+                    "@torch.jit.script": "",
+                },
             )
             if not no_err:
                 continue
@@ -856,7 +859,7 @@ class TaskNode(Node):
             messages, response, code, no_err = self._loop_until_no_syntax_err(
                 messages=self.messages,
                 response=response,
-                replacements={"weight=": "weight=30.0, #"},
+                replacements={"weight=": "weight=30.0, #", "@torch.jit.script": ""},
             )
             if not no_err:
                 continue
