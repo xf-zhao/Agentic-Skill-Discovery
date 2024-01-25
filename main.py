@@ -376,7 +376,12 @@ class Node:
     def _syntax_examine(
         self,
         code: str,
-        replacements={"RewTerm": "dict", "@configclass": "", "RLTaskEnv": "object"},
+        replacements={
+            "RewTerm": "dict",
+            "@configclass": "",
+            "RLTaskEnv": "object",
+            "@torch.jit.script": "",
+        },
         prefix_codes="import torch\n\n",
         remove_temp=False,
     ):

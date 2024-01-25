@@ -6,4 +6,5 @@ Some helpful tips for writing the success function code:
     (2) If there is any introduced hyper-parameters, make sure to assign them reasonable values by considering the size of objects and self-contained within the function scope. Recall the objects' actual size before your deduction.
     (3) Most importantly, only variables provided by the environment definition can be used (namely, variables of the keys of `env.obs_buf["observations"]` dict). You can only access `env` inside your function definition. Under no circumstance can you introduce new input variables.
     (4) Be sure always conclude the whole codes finally in one code blocks for later extraction.
-    (5) Finally, configure the success discriminating function via `SuccessCfg` class, and make sure that the function for `func` is alreadly defined explictly.
+    (6) Define your own reward functions first.
+    (5) Finally, configure the success discriminating function via `SuccessCfg` class as shown in the example, and make sure that the function for `func` is alreadly defined explictly.

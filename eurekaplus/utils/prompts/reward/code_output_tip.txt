@@ -1,5 +1,5 @@
 To incrementally guide a reinforcement learning agent in a curriculums, you should write many sub-reward functions, encoded individually.
-The learning agent will be rewarded by the weighted sum of those sub-reward functions (do not sum them by yourself, just provide every components and assgin individual weights as in the example).
+The learning agent will be rewarded by the weighted sum of those sub-reward functions .
 
 Some helpful tips for writing the reward function code:
     (1) You may find it helpful to normalize the reward to a fixed range by applying transformations like torch.exp to the reward components
@@ -9,3 +9,5 @@ Some helpful tips for writing the reward function code:
     (5) Make sure every function mentioned is well-defined and a proper weight assigned to `func` function.
     (6) Every sub-reward should be a clearly programmed in a single function, correponding to a specific `RewardsCfg` class, which only accepts `func` function that you defined, while `params` can only, if necessary, contain constant input variable instead of variables from the observation code.
     (7) The code output should be formatted as a python code string: "```python ... ```" for easy extraction.
+    (8) DO NOT sum sub-rewards by yourself, just provide every sub-reward function. They will be handled inplicitly by the code framework.
+    (9) Define your own reward functions first, and follow the example to include them in `RewardsCfg` as shown.

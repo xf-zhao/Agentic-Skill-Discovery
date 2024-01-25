@@ -25,6 +25,7 @@ def cube_a_is_lifted(env: RLTaskEnv) -> torch.Tensor:
     lifted_reward = torch.where(cube_a_height > minimal_height, 1.0, 0.0)
     return lifted_reward
 
+
 @configclass
 class RewardsCfg:
     reached_reward = RewTerm(
@@ -41,5 +42,3 @@ class RewardsCfg:
         func=cube_a_is_lifted,
         weight=10.0,
     ) 
-
-    # ... and more shaped rewarding components towards faster reinforcement learning
