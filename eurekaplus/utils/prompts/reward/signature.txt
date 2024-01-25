@@ -1,23 +1,29 @@
-# A typical sub-rewards function structure for guiding a robotic arm to lift cube A.
+# A typical sub-rewards function structure for guiding a robotic arm to lift cube A: the curriculums are reaching, grasping and then lifting.
 
-def to_reach_cube_a(env: RLTaskEnv) -> torch.Tensor:
+def reach_cube_a_with_ee(env: RLTaskEnv) -> torch.Tensor:
     """Manipulating objects requires approaching first. Reward the gripper for reaching cube A."""
-    reward = ... # to be implemented
-    return reward
+    obs = env.obs_buf["observations"]
+    # Distance of the end-effector to the object: (num_envs,)
+    distance = torch.norm(obs["cube_a_position"] - obs["ee_position"], dim=1)
+    std = 0.1
+    return 1 - torch.tanh(distance / std)
 
 def cube_a_is_grasped(env: RLTaskEnv) -> torch.Tensor:
     """Reward the agent for grasping the object"""
     obs = env.obs_buf["observations"]
     cube_a_ee_distance = torch.norm(obs['cube_a_position'] - obs["ee_position"], dim=1)
-    is_near_cube = torch.where(cube_a_ee_distance < 0.02, 1.0, 0.0)
+    is_near_cube = torch.where(cube_a_ee_distance < 0.02, 1.0, 0.0) # 0.01 ~ 0.02 is considered as close enough.
     reward = is_near_cube * (0.04 - obs["gripper_open_distance"].squeeze())
     return reward
 
-def cube_a_is_lifted(env: RLTaskEnv) -> torch.Tensor:
-    """Reward the agent for lifting the object above the minimal height."""
-    reward = ... # to be implemented
-    return reward
 
+def cube_a_is_lifted(env: RLTaskEnv) -> torch.Tensor:
+    """Reward the agent for lifting cube a above the minimal height."""
+    obs = env.obs_buf["observations"]
+    minimal_height = 0.06
+    cube_a_height = obs["cube_a_position"][:, 2]
+    lifted_reward = torch.where(cube_a_height > minimal_height, 1.0, 0.0)
+    return lifted_reward
 
 @configclass
 class RewardsCfg:

@@ -499,15 +499,15 @@ class RewardNode(Node):
             max_waiting
         ):  # Maximum 4 hour waiting time, long enough for finishing one run
             available_mem = psutil.virtual_memory().free / 1024 / 1024 / 1024
-            logging.info(f'Available mem: {available_mem}. (Require {self.memory_requirement})')
             if (
                 available_mem > self.memory_requirement
             ):  # 16 GB is the minimum mem for a new instance
                 break
             else:
                 if i % 60 == 0:
+                    logging.info(f'')
                     logging.info(
-                        f"Waiting for enough mem to run node {self.parent.parent.idx}-{self.parent.idx}-{self.idx}. Time elapsed: {i//6} minutes."
+                        f"Available mem: {available_mem}. (Require {self.memory_requirement}). Waiting for enough mem to run node {self.parent.parent.idx}-{self.parent.idx}-{self.idx}. Time elapsed: {i//6} minutes."
                     )
                 time.sleep(10)
         assert i < max_waiting - 1
@@ -673,7 +673,7 @@ class SuccessNode(Node):
         return self
 
     def propose(
-        self, num_envs=2048,max_iterations=2000, headless=False, memory_requirement=8
+        self, num_envs=2048,max_iterations=2000, headless=False, memory_requirement=10
     ) -> List[RewardNode]:
         self.children: List[RewardNode] = []
         responses, *_ = gpt_call(
@@ -682,8 +682,8 @@ class SuccessNode(Node):
             n_samples=self.n_samples,
             temperature=self.temperature,
         )
-        # if self.n_samples == 1:
-        #     logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
+        if self.n_samples == 1:
+            logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
 
         for response in responses:
             messages, response, code, no_err = self._loop_until_no_syntax_err(
