@@ -265,10 +265,12 @@ def extract_code_string(response):
     ]
     content = response["message"]["content"]
     # Regex patterns to extract python code enclosed in GPT response
+    code_string = ""
     for pattern in patterns:
-        code_string = re.findall(pattern, content, re.DOTALL)
-        if len(code_string) > 0:
-            code_string = code_string[-1].strip()
+        code_strings = re.findall(pattern, content, re.DOTALL)
+        if len(code_strings) > 0:
+            for cs in code_strings:
+                code_string += cs.strip() + "\n"
             break
         else:
             code_string = None
@@ -857,8 +859,8 @@ class TaskNode(Node):
             n_samples=self.n_samples,
             temperature=self.temperature,
         )
-        # if self.n_samples == 1:
-        #     logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
+        if self.n_samples == 1:
+            logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
 
         for response in responses:
             messages, response, code, no_err = self._loop_until_no_syntax_err(

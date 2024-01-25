@@ -3,5 +3,4 @@ The Python environment is
 {task_obs_code_string}
 ```
 Write a success deterministic function for the following task: {task_description}.
-
 Let's work this out in a step by step way to be sure we have the right answer.

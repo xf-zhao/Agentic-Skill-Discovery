@@ -7,4 +7,4 @@ As an example, the success condition function signature can be:
 ```
 Please make sure that the code is compatible with pytorch, for example, use torch tensor instead of numpy array. 
 Make sure any new tensor or variable you introduce is on the same device as the input tensors.
-You are not allowed to import other external python packages.
+You are not allowed to import other python modules.

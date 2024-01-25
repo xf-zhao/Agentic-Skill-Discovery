@@ -8,4 +8,4 @@ the reward function signature can be:
 Note that every `func` should be implemented by yourself.
 Please make sure that the code is compatible with pytorch (e.g., use torch tensor instead of numpy array). 
 Make sure any new tensor or variable you introduce is on the same device as the input tensors.
-You are not allowed to import other external python packages.
+You are not allowed to import other python modules.
