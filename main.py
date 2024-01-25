@@ -414,10 +414,11 @@ class Node:
 
 
 class RewardNode(Node):
-    def __init__(self, num_envs=11, task=None, *args, **kwargs) -> None:
+    def __init__(self, num_envs=11, task=None, headless=False, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Reward"
         self.task = task
+        self.headless = headless
         self.runable = True
         self.num_envs = num_envs
         self.rl_run = None
@@ -477,32 +478,39 @@ class RewardNode(Node):
     def run(self):
         # Only run when memory is enough
         max_waiting = 60 * 60 * 3 // 10
-        for i in range(max_waiting):  # maximum 3 hour waiting time
-            available_mem = psutil.virtual_memory().available / 1024 / 1024
+        for i in range(
+            max_waiting
+        ):  # maximum 3 hour waiting time, long enough for finishing one run
+            available_mem = psutil.virtual_memory().free / 1024 / 1024 / 1024
             if available_mem > 16:  # 16 GB is the minimum mem for a new instance
                 break
             else:
-                j = i % 6
+                j = i % 60
                 if j == 0:
-                    logging.info(f"Waiting for enough mem. Time elapsed: {j} minutes.")
+                    logging.info(
+                        f"Waiting for enough mem to run node {self.parent.parent.idx}-{self.parent.idx}-{self.idx}. Time elapsed: {j} x 10 minutes."
+                    )
             time.sleep(10)
-        assert i < max_waiting-1
+        assert i < max_waiting - 1
 
         # Find the freest GPU to run GPU-accelerated RL
         set_freest_gpu()
 
         # Execute the python file with flags
+        rl_run_command = [
+            f"{ORBIT_ROOT_DIR}/orbit.sh",
+            "-p",
+            f"{self.root_dir}/rsl_rl/train.py",
+            "--task",
+            f"{self.idx}",
+            "--num_envs",
+            f"{self.num_envs}",
+        ]
+        if self.headless:
+            rl_run_command.append("--headless")
         with open(self.rl_filepath, "w") as f:
             self.rl_run = subprocess.Popen(
-                [
-                    f"{ORBIT_ROOT_DIR}/orbit.sh",
-                    "-p",
-                    f"{self.root_dir}/rsl_rl/train.py",
-                    "--task",
-                    f"{self.idx}",
-                    "--num_envs",
-                    f"{self.num_envs}",
-                ],
+                rl_run_command,
                 stdout=f,
                 stderr=f,
             )
@@ -643,7 +651,7 @@ class SuccessNode(Node):
         ]
         return self
 
-    def propose(self, num_envs=2048) -> List[RewardNode]:
+    def propose(self, num_envs=2048, headless=False) -> List[RewardNode]:
         self.children: List[RewardNode] = []
         responses, *_ = gpt_call(
             messages=self.messages,
@@ -668,6 +676,7 @@ class SuccessNode(Node):
                 messages=messages,
                 response=response,
                 code=code,
+                headless=headless,
             )
             self.add_child(child)
             child.init()
@@ -808,7 +817,7 @@ class TaskNode(Node):
 
         return self
 
-    def propose(self, iterations=3, n_samples=3) -> List[SuccessNode]:
+    def propose(self, iterations=3, n_samples=3, temperature=0) -> List[SuccessNode]:
         responses, *_ = gpt_call(
             messages=self.messages,
             model=self.model,
@@ -833,6 +842,7 @@ class TaskNode(Node):
                 code=code,
                 iterations=iterations,
                 n_samples=n_samples,
+                temperature=temperature,
             )
             self.add_child(child)
             child.init()
@@ -865,7 +875,7 @@ class EnvNode(Node):
         ]
         return self
 
-    def propose_fake(self) -> List[TaskNode]:
+    def propose_fake(self, n_samples=1, temperature=0) -> List[TaskNode]:
         pattern = r"([Tt]ask\s+\d+:.*)"
         content = """
 Task 1: Move Cube A to a specific target position on the table.
@@ -883,12 +893,16 @@ Task 10: Pick up Cube B and place it on top of Cube A.
 
         for task in tasks:
             code = task.split(": ")[-1]
-            child: TaskNode = TaskNode(code=code)
+            child: TaskNode = TaskNode(
+                code=code,
+                n_samples=n_samples,
+                temperature=temperature,
+            )
             self.add_child(child)
             child.init()
         return self.children
 
-    def propose(self) -> List[TaskNode]:
+    def propose(self, n_samples=1, temperature=0) -> List[TaskNode]:
         messages = self.messages
         responses, *_ = gpt_call(
             messages=messages,
@@ -903,7 +917,9 @@ Task 10: Pick up Cube B and place it on top of Cube A.
         tasks = re.findall(pattern, content)
         for task in tasks:
             code = task.split(": ")[-1]
-            child: TaskNode = TaskNode(code=code)
+            child: TaskNode = TaskNode(
+                code=code, n_samples=n_samples, temperature=temperature
+            )
             self.add_child(child)
             child.init()
         return self.children
@@ -927,25 +943,29 @@ def main(cfg):
         model="gpt-3.5-turbo",
         # model="gpt-4-1106-preview",
         n_samples=1,
-        temperature=0,
+        temperature=cfg.temperature,
     ).init()
-    task_nodes = env_node.propose_fake()
-    # task_nodes = env_node.propose()
-    for task_node in task_nodes:
-        break
 
-    # Eureka generation loop
+    # Eureka-plus generation loop
     for i in range(cfg.iteration):
         logging.info(f"Iteration {i}: Generating with {cfg.model}")
-
-        success_nodes = task_node.propose(iterations=3, n_samples=3)
-        for success_node in success_nodes:
-            for _ in range(success_node.iterations):
-                reward_nodes = success_node.propose(num_envs=num_envs)
+        task_nodes = env_node.propose_fake(n_samples=2, temperature=cfg.temperature)
+        # task_nodes = env_node.propose()
+        for task_node in task_nodes:
+            break
+        success_nodes = task_node.propose(
+            n_samples=3, iterations=2, temperature=cfg.temperature
+        )  # params for child init
+        for i in range(2):
+            for success_node in success_nodes:
+                reward_nodes = success_node.propose(
+                    num_envs=num_envs, headless=cfg.headless
+                )
                 for node in reward_nodes:
-                    print(f"Fake run node: {node.idx}.")
                     node.run()
-                # success_node.collect()
+            for success_node in success_nodes:
+                success_node.collect()
+        task_node.collect()  # check behavior caption
 
     # # Evaluate the best reward code many times
     # # if max_reward_idxs is None:
