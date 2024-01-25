@@ -1,6 +1,7 @@
 import hydra
 import numpy as np
 import json
+import psutil
 import logging
 import matplotlib.pyplot as plt
 import os
@@ -280,7 +281,7 @@ class Node:
         response=None,
         code=None,
         root_dir=None,
-        iterations = 1,
+        iterations=1,
         env_name="franka_table",
         model="gpt-3.5-turbo",
         n_samples=1,
@@ -474,6 +475,19 @@ class RewardNode(Node):
         return
 
     def run(self):
+        # Only run when memory is enough
+        max_waiting = 60 * 60 * 3 // 10
+        for i in range(max_waiting):  # maximum 3 hour waiting time
+            available_mem = psutil.virtual_memory().available / 1024 / 1024
+            if available_mem > 16:  # 16 GB is the minimum mem for a new instance
+                break
+            else:
+                j = i % 6
+                if j == 0:
+                    logging.info(f"Waiting for enough mem. Time elapsed: {j} minutes.")
+            time.sleep(10)
+        assert i < max_waiting-1
+
         # Find the freest GPU to run GPU-accelerated RL
         set_freest_gpu()
 
@@ -543,7 +557,7 @@ class RewardNode(Node):
         if traceback_msg == "":
             # If RL execution has no error, provide policy statistics feedback
             exec_success = True
-            success_reward_key = 'Episode Reward'
+            success_reward_key = "Episode Reward"
             lines = stdout_str.split("\n")
             for i, line in enumerate(lines):
                 if line.startswith("Log Directory:"):
@@ -557,7 +571,7 @@ class RewardNode(Node):
 
             # Add reward components log to the feedback
             for metric in tensorboard_logs:
-                if metric.startswith('Episode Reward/') and '/terminate_' not in metric:
+                if metric.startswith("Episode Reward/") and "/terminate_" not in metric:
                     metric_cur = [
                         "{:.2f}".format(x)
                         for x in tensorboard_logs[metric][::epoch_freq]
@@ -569,7 +583,7 @@ class RewardNode(Node):
                     )
                     if success_reward_key == metric:
                         success = metric_cur_max
-                        metric_name = f'Reward component `{metric}`'
+                        metric_name = f"Reward component `{metric}`"
                     else:
                         metric_name = "Success score"
                         content += f"{metric_name}: {metric_cur}, Max: {metric_cur_max:.2f}, Mean: {metric_cur_mean:.2f}, Min: {metric_cur_min:.2f} \n"
@@ -608,9 +622,9 @@ class SuccessNode(Node):
         self.max_success_overall = DUMMY_FAILURE
         self.max_reward_idx = None
         self.stats = {
-        "max_success": [],
-        "execute_rate": [],
-        "max_reward_idx": [],
+            "max_success": [],
+            "execute_rate": [],
+            "max_reward_idx": [],
         }
 
     def init(self):
@@ -628,7 +642,6 @@ class SuccessNode(Node):
             self._wrap_user_message(initial_user),
         ]
         return self
-
 
     def propose(self, num_envs=2048) -> List[RewardNode]:
         self.children: List[RewardNode] = []
@@ -686,7 +699,9 @@ class SuccessNode(Node):
                 child.remove()
         best_node.unlink()
         self.children = []
-        feedback = self._wrap_user_message(best_node.summary["content"] + self.code_feedback)
+        feedback = self._wrap_user_message(
+            best_node.summary["content"] + self.code_feedback
+        )
         self.messages = [*best_node.messages, best_node.response["message"], feedback]
         self.response = None
 
@@ -716,8 +731,6 @@ class SuccessNode(Node):
         self.ite += 1
         self._collect_stat(execute_rate, max_success, self.max_reward_idx)
         return any_success, stat
-
-
 
     def analyze_stats(self):
         stats = self.stats
@@ -755,6 +768,7 @@ class SuccessNode(Node):
         for k, v in stat.items():
             self.stats[k].append(v)
         return
+
 
 class TaskNode(Node):
     def __init__(self, *args, **kwargs) -> None:
@@ -813,7 +827,12 @@ class TaskNode(Node):
             if not no_err:
                 continue
             child: SuccessNode = SuccessNode(
-                task=self, messages=messages, response=response, code=code, iterations=iterations, n_samples=n_samples
+                task=self,
+                messages=messages,
+                response=response,
+                code=code,
+                iterations=iterations,
+                n_samples=n_samples,
             )
             self.add_child(child)
             child.init()
@@ -924,10 +943,9 @@ def main(cfg):
             for _ in range(success_node.iterations):
                 reward_nodes = success_node.propose(num_envs=num_envs)
                 for node in reward_nodes:
-                    print(f'Fake run node: {node.idx}.')
-                    # node.run()
+                    print(f"Fake run node: {node.idx}.")
+                    node.run()
                 # success_node.collect()
-
 
     # # Evaluate the best reward code many times
     # # if max_reward_idxs is None:

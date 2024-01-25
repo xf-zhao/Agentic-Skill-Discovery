@@ -5,3 +5,4 @@ logs/
 envs_gpt/
 outputs/
 .vscode/
+core
