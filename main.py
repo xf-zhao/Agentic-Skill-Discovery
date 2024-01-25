@@ -414,7 +414,15 @@ class Node:
 
 
 class RewardNode(Node):
-    def __init__(self, num_envs=11, task=None, headless=False, memory_requirement=16, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        num_envs=11,
+        task=None,
+        headless=False,
+        memory_requirement=16,
+        *args,
+        **kwargs,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Reward"
         self.task = task
@@ -483,7 +491,9 @@ class RewardNode(Node):
             max_waiting
         ):  # maximum 3 hour waiting time, long enough for finishing one run
             available_mem = psutil.virtual_memory().free / 1024 / 1024 / 1024
-            if available_mem > self.memory_requirement:  # 16 GB is the minimum mem for a new instance
+            if (
+                available_mem > self.memory_requirement
+            ):  # 16 GB is the minimum mem for a new instance
                 break
             else:
                 j = i % 60
@@ -652,7 +662,9 @@ class SuccessNode(Node):
         ]
         return self
 
-    def propose(self, num_envs=2048, headless=False) -> List[RewardNode]:
+    def propose(
+        self, num_envs=2048, headless=False, memory_requirement=8
+    ) -> List[RewardNode]:
         self.children: List[RewardNode] = []
         responses, *_ = gpt_call(
             messages=self.messages,
@@ -678,6 +690,7 @@ class SuccessNode(Node):
                 response=response,
                 code=code,
                 headless=headless,
+                memory_requirement=memory_requirement,
             )
             self.add_child(child)
             child.init()
@@ -960,7 +973,9 @@ def main(cfg):
         for i in range(2):
             for success_node in success_nodes:
                 reward_nodes = success_node.propose(
-                    num_envs=num_envs, headless=cfg.headless, memory_requirement=cfg.memory_requirement
+                    num_envs=num_envs,
+                    headless=cfg.headless,
+                    memory_requirement=cfg.memory_requirement,
                 )
                 for node in reward_nodes:
                     node.run()
