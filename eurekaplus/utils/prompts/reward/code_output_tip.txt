@@ -1,7 +1,5 @@
-The output of the reward function should consist of many reward components to incrementally guide the agent learning, each reward component has its own sub-function to compute and a weight assigned. 
-More reward components are encouraged for an incremental guidance for fast reinforcement learning in a curriculums.
-The total reward will be the weighted sum of the reward components.
-The code output should be formatted as a python code string: "```python ... ```".
+To incrementally guide a reinforcement learning agent in a curriculums, you should write many sub-reward functions, encoded individually.
+The learning agent will be rewarded by the weighted sum of those sub-reward functions (do not sum them by yourself, just provide every components and assgin individual weights as in the example).
 
 Some helpful tips for writing the reward function code:
     (1) You may find it helpful to normalize the reward to a fixed range by applying transformations like torch.exp to the reward components
@@ -9,5 +7,5 @@ Some helpful tips for writing the reward function code:
     (3) Make sure the type of each input variable is correctly specified; a float input variable should not be specified as torch.Tensor
     (4) Most importantly, only variables provided by the environment definition can be used (namely, variables of the keys of `env.obs_buf["observations"]` dict). You can only access `env` inside your function definition. Under no circumstance can you introduce new input variables.
     (5) Make sure every function mentioned is well-defined and a proper weight assigned to `func` function.
-    (6) Every reward component should be a clearly programmed in a single function, correponding to a specific `RewardsCfg` class, which only accepts `func` function that you defined, while `params` can only, if necessary, contain constant input variable instead of variables from the observation code.
-    (6) The sum of reward components will be handled automatically by the code framework. Do not manage to sum them in your results. 
+    (6) Every sub-reward should be a clearly programmed in a single function, correponding to a specific `RewardsCfg` class, which only accepts `func` function that you defined, while `params` can only, if necessary, contain constant input variable instead of variables from the observation code.
+    (7) The code output should be formatted as a python code string: "```python ... ```" for easy extraction.

@@ -31,3 +31,13 @@ gym.register(
     },
     disable_env_checker=True,
 )
+
+gym.register(
+    id="Franka_Table-Play",
+    entry_point="omni.isaac.orbit.envs:RLTaskEnv",
+    kwargs={
+        "env_cfg_entry_point": franka_table_env_cfg.FrankaPlayCubeEnvCfg_PLAY,
+        "rsl_rl_cfg_entry_point": agents.rsl_rl_cfg.PlayCubePPORunnerCfg,
+    },
+    disable_env_checker=True,
+)

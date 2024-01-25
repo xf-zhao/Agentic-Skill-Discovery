@@ -267,10 +267,11 @@ def extract_code_string(response):
     # Regex patterns to extract python code enclosed in GPT response
     for pattern in patterns:
         code_string = re.findall(pattern, content, re.DOTALL)
-        if code_string is not None:
+        if len(code_string) > 0:
             code_string = code_string[-1].strip()
             break
-    code_string = content if not code_string else code_string
+        else:
+            code_string = None
     return code_string
 
 
@@ -314,6 +315,9 @@ class Node:
             f"{self.root_dir}/envs/{self.env_name}/env_cfg/termination.py"
         )
         self.env_obs_code = self._extract_env_obs()
+        self.code_format_feedback = file_to_string(
+            f"{self.prompt_dir}/reward/code_format_feedback.txt"
+        )
 
     def init(self):
         self.idx = f"{self.type[0]}{uuid.uuid4().hex[:8]}"
@@ -376,6 +380,8 @@ class Node:
         prefix_codes="import torch\n\n",
         remove_temp=False,
     ):
+        if code is None:
+            return False, self.code_format_feedback
         err_feedback = None
         for k, v in replacements.items():
             code = code.replace(k, v)
@@ -486,22 +492,21 @@ class RewardNode(Node):
 
     def run(self):
         # Only run when memory is enough
-        max_waiting = 60 * 60 * 3 // 10
+        max_waiting = 60 * 60 * 4 // 10
         for i in range(
             max_waiting
-        ):  # maximum 3 hour waiting time, long enough for finishing one run
+        ):  # Maximum 4 hour waiting time, long enough for finishing one run
             available_mem = psutil.virtual_memory().free / 1024 / 1024 / 1024
             if (
                 available_mem > self.memory_requirement
             ):  # 16 GB is the minimum mem for a new instance
                 break
             else:
-                j = i % 60
-                if j == 0:
+                if i % 60 == 0:
                     logging.info(
-                        f"Waiting for enough mem to run node {self.parent.parent.idx}-{self.parent.idx}-{self.idx}. Time elapsed: {j} x 10 minutes."
+                        f"Waiting for enough mem to run node {self.parent.parent.idx}-{self.parent.idx}-{self.idx}. Time elapsed: {i//6} minutes."
                     )
-            time.sleep(10)
+                time.sleep(10)
         assert i < max_waiting - 1
 
         # Find the freest GPU to run GPU-accelerated RL
@@ -672,8 +677,8 @@ class SuccessNode(Node):
             n_samples=self.n_samples,
             temperature=self.temperature,
         )
-        if self.n_samples == 1:
-            logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
+        # if self.n_samples == 1:
+        #     logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
 
         for response in responses:
             messages, response, code, no_err = self._loop_until_no_syntax_err(
@@ -838,8 +843,8 @@ class TaskNode(Node):
             n_samples=self.n_samples,
             temperature=self.temperature,
         )
-        if self.n_samples == 1:
-            logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
+        # if self.n_samples == 1:
+        #     logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
 
         for response in responses:
             messages, response, code, no_err = self._loop_until_no_syntax_err(

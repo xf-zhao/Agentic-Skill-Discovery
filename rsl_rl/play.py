@@ -53,6 +53,8 @@ from omni.isaac.orbit_tasks.utils.wrappers.rsl_rl import (
     export_policy_as_onnx,
 )
 
+import envs, envs_gpt  # noqa: F401
+
 
 def main():
     """Play with RSL-RL agent."""
