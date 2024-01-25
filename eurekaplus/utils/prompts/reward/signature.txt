@@ -1,29 +1,39 @@
-def cube_a_is_lifted(env: RLTaskEnv) -> torch.Tensor:
-    """Reward the agent for lifting the object above the minimal height."""
-    obs = env.obs_buf["observations"]
-    minimal_height = 0.06 # self-contained hyper-parameters
-    cube_a_height = obs["cube_a_position"][:, 2]
-    lifted_reward = torch.where(cube_a_height > minimal_height, 1.0, 0.0)
-    return lifted_reward
+# A typical sub-rewards function structure for guiding a robotic arm to lift cube A.
+
+def to_reach_cube_a(env: RLTaskEnv) -> torch.Tensor:
+    """Manipulating objects requires approaching first. Reward the gripper for reaching cube A."""
+    reward = ... # to be implemented
+    return reward
 
 def cube_a_is_grasped(env: RLTaskEnv) -> torch.Tensor:
     """Reward the agent for grasping the object"""
     obs = env.obs_buf["observations"]
     cube_a_ee_distance = torch.norm(obs['cube_a_position'] - obs["ee_position"], dim=1)
     is_near_cube = torch.where(cube_a_ee_distance < 0.02, 1.0, 0.0)
-    encourage_close_reward = is_near_cube * (0.04 - obs["gripper_open_distance"].squeeze())
-    return encourage_close_reward
+    reward = is_near_cube * (0.04 - obs["gripper_open_distance"].squeeze())
+    return reward
+
+def cube_a_is_lifted(env: RLTaskEnv) -> torch.Tensor:
+    """Reward the agent for lifting the object above the minimal height."""
+    reward = ... # to be implemented
+    return reward
 
 
 @configclass
 class RewardsCfg:
-    # The first reward component to encourage grasping
-    cube_a_grasped = RewTerm(
-        func=is_object_out_of_table,
-        weight=25.0,
+    reached_reward = RewTerm(
+        func=to_reach_cube_a,
+        weight=1.0,
     ) 
 
-    # It is encouraged to have more reward components. (They should be with distinguish names)
-    cube_a_lifted = RewTerm(func=cube_a_is_lifted, weight=10.0)
+    grasped_reward = RewTerm(
+        func=cube_a_is_grasped,
+        weight=5.0,
+    ) 
+
+    lift_reward = RewTerm(
+        func=cube_a_is_lifted,
+        weight=10.0,
+    ) 
 
     # ... and more shaped rewarding components towards faster reinforcement learning

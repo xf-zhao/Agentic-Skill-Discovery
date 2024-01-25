@@ -42,6 +42,9 @@ parser.add_argument(
 parser.add_argument(
     "--num_envs", type=int, default=None, help="Number of environments to simulate."
 )
+parser.add_argument(
+    "--max_iterations", type=int, default=None, help="Number of RL iterations."
+)
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument(
     "--seed", type=int, default=None, help="Seed used for the environment"
@@ -165,7 +168,7 @@ def main():
 
     # run training
     runner.learn(
-        num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True
+        num_learning_iterations=args_cli.max_iterations, init_at_random_ep_len=True
     )
 
     # close the simulator

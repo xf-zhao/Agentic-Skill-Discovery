@@ -426,6 +426,7 @@ class RewardNode(Node):
         task=None,
         headless=False,
         memory_requirement=16,
+        max_iterations = 2000,
         *args,
         **kwargs,
     ) -> None:
@@ -445,6 +446,7 @@ class RewardNode(Node):
             f"{self.prompt_dir}/reward/code_feedback.txt"
         )
         self.cur_env_dir = None
+        self.max_iterations = max_iterations
 
     def init(self):
         super().init()
@@ -497,6 +499,7 @@ class RewardNode(Node):
             max_waiting
         ):  # Maximum 4 hour waiting time, long enough for finishing one run
             available_mem = psutil.virtual_memory().free / 1024 / 1024 / 1024
+            logging.info(f'Available mem: {available_mem}. (Require {self.memory_requirement})')
             if (
                 available_mem > self.memory_requirement
             ):  # 16 GB is the minimum mem for a new instance
@@ -521,6 +524,8 @@ class RewardNode(Node):
             f"{self.idx}",
             "--num_envs",
             f"{self.num_envs}",
+            "--max_iterations",
+            f'{self.max_iterations}'
         ]
         if self.headless:
             rl_run_command.append("--headless")
@@ -668,7 +673,7 @@ class SuccessNode(Node):
         return self
 
     def propose(
-        self, num_envs=2048, headless=False, memory_requirement=8
+        self, num_envs=2048,max_iterations=2000, headless=False, memory_requirement=8
     ) -> List[RewardNode]:
         self.children: List[RewardNode] = []
         responses, *_ = gpt_call(
@@ -690,6 +695,7 @@ class SuccessNode(Node):
                 continue
             child = RewardNode(
                 num_envs=num_envs,
+                max_iterations=max_iterations,
                 task=self.task,
                 messages=messages,
                 response=response,
@@ -981,6 +987,7 @@ def main(cfg):
                     num_envs=num_envs,
                     headless=cfg.headless,
                     memory_requirement=cfg.memory_requirement,
+                    max_iterations=cfg.max_iterations,
                 )
                 for node in reward_nodes:
                     node.run()
