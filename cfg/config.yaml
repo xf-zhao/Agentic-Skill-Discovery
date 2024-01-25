@@ -16,6 +16,7 @@ suffix: _GPT  # suffix for generated files (indicates LLM model)
 debug: False
 num_envs: 2048
 headless: False
+memory_requirement: 8
 
 # Eureka parameters
 iteration: 1 # how many iterations of Eureka to run

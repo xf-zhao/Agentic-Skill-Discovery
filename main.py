@@ -414,7 +414,7 @@ class Node:
 
 
 class RewardNode(Node):
-    def __init__(self, num_envs=11, task=None, headless=False, *args, **kwargs) -> None:
+    def __init__(self, num_envs=11, task=None, headless=False, memory_requirement=16, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Reward"
         self.task = task
@@ -423,6 +423,7 @@ class RewardNode(Node):
         self.num_envs = num_envs
         self.rl_run = None
         self.rl_filepath = None
+        self.memory_requirement = memory_requirement
         self.policy_feedback = file_to_string(
             f"{self.prompt_dir}/reward/policy_feedback.txt"
         )
@@ -482,7 +483,7 @@ class RewardNode(Node):
             max_waiting
         ):  # maximum 3 hour waiting time, long enough for finishing one run
             available_mem = psutil.virtual_memory().free / 1024 / 1024 / 1024
-            if available_mem > 16:  # 16 GB is the minimum mem for a new instance
+            if available_mem > self.memory_requirement:  # 16 GB is the minimum mem for a new instance
                 break
             else:
                 j = i % 60
@@ -959,7 +960,7 @@ def main(cfg):
         for i in range(2):
             for success_node in success_nodes:
                 reward_nodes = success_node.propose(
-                    num_envs=num_envs, headless=cfg.headless
+                    num_envs=num_envs, headless=cfg.headless, memory_requirement=cfg.memory_requirement
                 )
                 for node in reward_nodes:
                     node.run()
