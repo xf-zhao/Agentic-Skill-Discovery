@@ -9,14 +9,15 @@ hydra:
     chdir: True
 
 # LLM parameters
-# model: gpt-4-0314  # LLM model (other options are gpt-4, gpt-4-0613, gpt-3.5-turbo-16k-0613)
-model: gpt-3.5-turbo  # LLM model (other options are gpt-4, gpt-4-0613, gpt-3.5-turbo-16k-0613)
+model: gpt-4-0314  # LLM model (other options are gpt-4, gpt-4-0613, gpt-3.5-turbo-16k-0613)
+# model: gpt-3.5-turbo  # LLM model (other options are gpt-4, gpt-4-0613, gpt-3.5-turbo-16k-0613)
 temperature: 0.7
 suffix: _GPT  # suffix for generated files (indicates LLM model)
 debug: False
 num_envs: 2048
 headless: True
 memory_requirement: 6
+video: True
 
 # Eureka parameters
 iteration: 1 # how many iterations of Eureka to run
