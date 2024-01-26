@@ -867,7 +867,9 @@ class TaskNode(Node):
 
         return self
 
-    def propose(self, iterations=3, n_samples=3, temperature=0) -> List[SuccessNode]:
+    def propose(
+        self, iterations=3, n_samples=3, temperature=0, model="gpt-3.5-turbo"
+    ) -> List[SuccessNode]:
         responses, *_ = gpt_call(
             messages=self.messages,
             model=self.model,
@@ -893,6 +895,7 @@ class TaskNode(Node):
                 iterations=iterations,
                 n_samples=n_samples,
                 temperature=temperature,
+                model=model,
             )
             self.add_child(child)
             child.init()
@@ -925,7 +928,9 @@ class EnvNode(Node):
         ]
         return self
 
-    def propose_fake(self, n_samples=1, temperature=0) -> List[TaskNode]:
+    def propose_fake(
+        self, n_samples=1, temperature=0, model="gpt-3.5-turbo"
+    ) -> List[TaskNode]:
         pattern = r"([Tt]ask\s+\d+:.*)"
         content = """
 Task 1: Move Cube A to a specific target position on the table.
@@ -947,12 +952,15 @@ Task 10: Pick up Cube B and place it on top of Cube A.
                 code=code,
                 n_samples=n_samples,
                 temperature=temperature,
+                model=model,
             )
             self.add_child(child)
             child.init()
         return self.children
 
-    def propose(self, n_samples=1, temperature=0) -> List[TaskNode]:
+    def propose(
+        self, n_samples=1, temperature=0, model="gpt-3.5-turbo"
+    ) -> List[TaskNode]:
         messages = self.messages
         responses, *_ = gpt_call(
             messages=messages,
@@ -968,7 +976,7 @@ Task 10: Pick up Cube B and place it on top of Cube A.
         for task in tasks:
             code = task.split(": ")[-1]
             child: TaskNode = TaskNode(
-                code=code, n_samples=n_samples, temperature=temperature
+                code=code, n_samples=n_samples, temperature=temperature, model=model
             )
             self.add_child(child)
             child.init()
@@ -990,21 +998,22 @@ def main(cfg):
     num_envs = 11 if cfg.debug else cfg.num_envs
     env_node = EnvNode(
         env_name=env_name,
-        model="gpt-3.5-turbo",
-        # model="gpt-4-1106-preview",
+        model=model,
         n_samples=1,
         temperature=cfg.temperature,
     ).init()
 
     # Eureka-plus generation loop
     for i in range(cfg.iteration):
-        logging.info(f"Iteration {i}: Generating with {cfg.model}")
-        task_nodes = env_node.propose_fake(n_samples=2, temperature=cfg.temperature)
+        logging.info(f"Iteration {i}: Generating with {model}")
+        task_nodes = env_node.propose_fake(
+            n_samples=2, temperature=cfg.temperature, model=model
+        )
         # task_nodes = env_node.propose()
         for task_node in task_nodes:
             break
         success_nodes = task_node.propose(
-            n_samples=3, iterations=2, temperature=cfg.temperature
+            n_samples=3, iterations=2, temperature=cfg.temperature, model=model
         )  # params for child init
         for i in range(2):
             for success_node in success_nodes:
