@@ -255,7 +255,7 @@ def gpt_call(
     return responses, total_samples, total_completion_token, total_token
 
 
-def extract_code_string(response):
+def extract_code_string(response, combine_all=False):
     patterns = [
         r"```python(.*?)```",
         r"```(.*?)```",
@@ -269,8 +269,11 @@ def extract_code_string(response):
     for pattern in patterns:
         code_strings = re.findall(pattern, content, re.DOTALL)
         if len(code_strings) > 0:
-            for cs in code_strings:
-                code_string += cs.strip() + "\n"
+            if combine_all:
+                for cs in code_strings:
+                    code_string += cs.strip() + "\n"
+            else:
+                code_string = code_strings[-1].strip() # assume the last is a combined one.
             break
         else:
             code_string = None

@@ -5,6 +5,7 @@ As an example, the success condition function signature can be:
 ```python
 {signature_string}
 ```
-Please make sure that the code is compatible with pytorch, for example, use torch tensor instead of numpy array. 
+Follow the format of this signature when writing your own for later tasks.
+Please make sure that the code is compatible with pytorch, for example, use torch tensor instead of numpy array.
 Make sure any new tensor or variable you introduce is on the same device as the input tensors.
 You are not allowed to import other python modules.

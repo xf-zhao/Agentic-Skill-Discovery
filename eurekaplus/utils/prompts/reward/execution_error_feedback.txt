@@ -1,1 +1,3 @@
 Executing the reward function code above has the following error: {traceback_msg}. Please fix the bug and provide a new, improved reward function!
+Tips: 
+If it is tensor shape mismatch error, it means the output of your sub-reward function is not in a shape of (num_envs, ), maybe try to revise the function or to reshape using `tensor.squeeze()`
