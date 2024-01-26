@@ -469,6 +469,7 @@ class RewardNode(Node):
             f"{self.parent.parent.idx}-{self.parent.idx}-{self.idx}-{self.ite}.txt"
         )
         self.cur_env_dir = cur_env_dir
+        self.log_dir =f'{self.cur_env_dir}/logs'
         if os.path.exists(cur_env_dir):
             os.removedirs(cur_env_dir)
             logging.info(f"Remove directory {cur_env_dir}.")
@@ -503,7 +504,7 @@ class RewardNode(Node):
         cur_env_dir = self.cur_env_dir
         if os.path.exists(cur_env_dir):
             os.removedirs(cur_env_dir)
-            logging.info(f"Remove node {self.idx} and its directory {cur_env_dir}.")
+            logging.info(f"Removed node {self.idx} and its directory {cur_env_dir}.")
         return
 
     def run(self):
@@ -540,11 +541,15 @@ class RewardNode(Node):
             f"{self.num_envs}",
             "--max_iterations",
             f"{self.max_iterations}",
+            "--log_dir",
+            self.log_dir,
         ]
         if self.headless:
             rl_run_command.append("--headless")
         if self.video:
             rl_run_command.append("--video")
+            if self.headless:
+                rl_run_command.append("--offscreen_render")
         with open(self.rl_filepath, "w") as f:
             self.rl_run = subprocess.Popen(
                 rl_run_command,
@@ -636,6 +641,7 @@ class RewardNode(Node):
             # Otherwise, provide execution traceback error feedback
             success = DUMMY_FAILURE
             content += self.execution_error_feedback.format(traceback_msg=traceback_msg)
+            self.remove()
 
         summary = {
             "exec_success": exec_success,
@@ -981,6 +987,40 @@ Task 10: Pick up Cube B and place it on top of Cube A.
             self.add_child(child)
             child.init()
         return self.children
+
+
+
+import imageio.v3 as iio
+
+def video_to_frames(video_file):
+    # video_to_frames(log_dir+'/rl-video-step-0.mp4')
+    frames = iio.imread(video_file)
+    start_frame, end_frame = frames[0], frames[-1]
+    return start_frame, end_frame
+
+def gptv_call(model='gpt-4-vision-preview'):
+    client = openai.OpenAI()
+
+    response = client.chat.completions.create(
+  model=model,
+  messages=[
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "Describe this image."},
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+          },
+        },
+      ],
+    }
+  ],
+  max_tokens=300,
+)
+
+    print(response.choices[0])
 
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")

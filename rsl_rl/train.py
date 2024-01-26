@@ -43,9 +43,10 @@ parser.add_argument(
     "--num_envs", type=int, default=None, help="Number of environments to simulate."
 )
 parser.add_argument(
-    "--max_iterations", type=int, default=None, help="Number of RL iterations."
+    "--max_iterations", type=int, default=200, help="Number of RL iterations."
 )
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+parser.add_argument("--log_dir", type=str, default=None, help="Log dir to store weights, videos.")
 parser.add_argument(
     "--seed", type=int, default=None, help="Seed used for the environment"
 )
@@ -117,10 +118,13 @@ def main():
     log_root_path = os.path.abspath(log_root_path)
     print(f"[INFO] Logging experiment in directory: {log_root_path}")
     # specify directory for logging runs: {time-stamp}_{run_name}
-    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    if agent_cfg.run_name:
-        log_dir += f"_{agent_cfg.run_name}"
-    log_dir = os.path.join(log_root_path, log_dir)
+    if args_cli.log_dir:
+        log_dir = args_cli.log_dir
+    else:
+        log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        if agent_cfg.run_name:
+            log_dir += f"_{agent_cfg.run_name}"
+        log_dir = os.path.join(log_root_path, log_dir)
     print(f'Log Directory: {log_dir}')
 
     # create isaac environment
@@ -168,7 +172,7 @@ def main():
 
     # run training
     runner.learn(
-        num_learning_iterations=args_cli.max_iterations, init_at_random_ep_len=True
+        num_learning_iterations=int(args_cli.max_iterations), init_at_random_ep_len=True
     )
 
     # close the simulator
