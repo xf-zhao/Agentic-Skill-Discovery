@@ -7,5 +7,5 @@ Some helpful tips for writing the success function code:
     (3) Only variables provided by the environment definition can be used (namely, variables of the keys of `env.obs_buf["observations"]` dict). You can only access `env` inside your function definition. Under no circumstance can you introduce new input variables.
     (4) Each new defined function should output a tensor of a shape (num_envs, ), call `tensor.squeeze()` to convert to this shape but only when necessary.
     (5) Do not try access observations or have any variable outside the scope of sub-reward function.
-    (6) Finally, configure class `SuccessCfg` with the new defined success function as shown in the signature.
-    (7) `RewTerm`, `RLTaskEnv`, and `configclass`, etc, are already defined. Do not try to import them.
+    (6) Finally, configure class `SuccessCfg` with the new defined success function as shown in the signature. Remember to put all codes together as a whole python block.
+    (7) `RewTerm`, `RLTaskEnv`, and `configclass`, etc, are already defined. Do not try to import them or any other modules by yourself.

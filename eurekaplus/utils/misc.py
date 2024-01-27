@@ -1,9 +1,10 @@
 import subprocess
+import re
 import os
 import json
 import logging
 
-from .extract_task_code import file_to_string
+# from .extract_task_code import file_to_string
 
 def set_freest_gpu():
     freest_gpu = get_freest_gpu()
@@ -18,16 +19,19 @@ def get_freest_gpu():
 
     return freest_gpu['index']
 
-def filter_traceback(s):
+def filter_traceback(s, idx=None):
     lines = s.split('\n')
-    filtered_lines = []
     for i, line in enumerate(lines):
-        if line.startswith('Traceback'):
-            for j in range(i, len(lines)):
-                if "Set the environment variable HYDRA_FULL_ERROR=1" in lines[j]:
-                    break
-                filtered_lines.append(lines[j])
-            return '\n'.join(filtered_lines)
+        if 'Learning iteration 0/' in line:
+            return ''
+    pattern = r'(Traceback.*?Error:\s.*?\n)'
+    traceback_msgs = re.findall(pattern, s, re.DOTALL)
+    if len(traceback_msgs) > 0:
+        logging.warning(f'Some env contains errors to import, may hinder this run.')
+        if idx is not None:
+            for msg in traceback_msgs:
+                if idx in msg:
+                    return msg
     return ''  # Return an empty string if no Traceback is found
 
 

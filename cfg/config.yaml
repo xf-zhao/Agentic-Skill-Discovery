@@ -18,7 +18,7 @@ num_envs: 2048
 max_iterations: 500 # RL Policy training iterations (decrease this to make the feedback loop faster)
 headless: True
 video: False
-memory_requirement: 5
+memory_requirement: 4
 
 # Eureka parameters
 iteration: 1 # how many iterations of Eureka to run

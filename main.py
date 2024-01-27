@@ -220,11 +220,12 @@ def gpt_call(
     for msg in messages:
         print(msg["content"])
 
-    chunk_size = n_samples if "gpt-3.5" in model else 4
+    # chunk_size = n_samples if "gpt-3.5" in model else 4
+    chunk_size = n_samples
     while True:
         if total_samples >= n_samples:
             break
-        for attempt in range(1000):
+        for attempt in range(10):
             try:
                 response_cur = openai.ChatCompletion.create(
                     model=model,
@@ -238,7 +239,11 @@ def gpt_call(
                 if attempt >= 10:
                     chunk_size = max(int(chunk_size / 2), 1)
                     print("Current Chunk Size", chunk_size)
-                logging.info(f"Attempt {attempt+1} failed with error: {e}")
+                err_msg = f"Attempt {attempt+1} failed with error: {e}"
+                logging.info(err_msg)
+                if 'maximum context length' in err_msg:
+                    responses = None
+                    return
                 time.sleep(1)
         if response_cur is None:
             logging.info("Code terminated due to too many failed attempts!")
@@ -358,25 +363,36 @@ class Node:
         return code_string
 
     def _loop_until_no_syntax_err(self, messages, response=None, replacements={}):
-        messages = messages.copy()
-        for _ in range(5):
-            if response is None:
-                response, *_ = gpt_call(
-                    messages=messages,
-                    model=self.model,
-                    n_samples=1,
-                    temperature=0,
-                )[0]
-            code = extract_code_string(response=response)
-            no_err, err_feedback = self._syntax_examine(code)
-            if not no_err:
-                messages.extend(
-                    [response["message"], self._wrap_user_message(err_feedback)]
-                )
-                response = None
-            else:
-                for k, v in replacements.items():
-                    code = code.replace(k, v)
+        init_messages = messages.copy()
+        for __ in range(10):
+            messages = init_messages.copy()
+            gpt_err = False
+            for _ in range(5):
+                if response is None:
+                    responses, *_ = gpt_call(
+                        messages=messages,
+                        model=self.model,
+                        n_samples=1,
+                        temperature=self.temperature,
+                    )
+                    if responses is None:
+                        gpt_err = True
+                        break
+                    else:
+                        gpt_err = False
+                        response = responses[0]
+                code = extract_code_string(response=response)
+                no_err, err_feedback = self._syntax_examine(code)
+                if not no_err:
+                    messages.extend(
+                        [response["message"], self._wrap_user_message(err_feedback)]
+                    )
+                    response = None
+                else:
+                    for k, v in replacements.items():
+                        code = code.replace(k, v)
+                    break
+            if not gpt_err:
                 break
         return messages, response, code, no_err
 
@@ -889,7 +905,8 @@ class TaskNode(Node):
             messages, response, code, no_err = self._loop_until_no_syntax_err(
                 messages=self.messages,
                 response=response,
-                replacements={"weight=": "weight=30.0, #", "@torch.jit.script": ""},
+                # replacements={"weight=": "weight=30.0, #", "@torch.jit.script": ""},
+                replacements={"@torch.jit.script": ""},
             )
             if not no_err:
                 continue
@@ -987,40 +1004,6 @@ Task 10: Pick up Cube B and place it on top of Cube A.
             self.add_child(child)
             child.init()
         return self.children
-
-
-
-import imageio.v3 as iio
-
-def video_to_frames(video_file):
-    # video_to_frames(log_dir+'/rl-video-step-0.mp4')
-    frames = iio.imread(video_file)
-    start_frame, end_frame = frames[0], frames[-1]
-    return start_frame, end_frame
-
-def gptv_call(model='gpt-4-vision-preview'):
-    client = openai.OpenAI()
-
-    response = client.chat.completions.create(
-  model=model,
-  messages=[
-    {
-      "role": "user",
-      "content": [
-        {"type": "text", "text": "Describe this image."},
-        {
-          "type": "image_url",
-          "image_url": {
-            "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
-          },
-        },
-      ],
-    }
-  ],
-  max_tokens=300,
-)
-
-    print(response.choices[0])
 
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")

@@ -2,3 +2,4 @@ Executing the success function code above has the following error: {traceback_ms
 Tips:
 1. If it is function name not defined error, it may be because you forget to put all codes together into a single python block for user extraction, or you try to import unknown python packages, which is not allowed.
 2. If it is tensor shape mismatch error, it means the output of your sub-reward function is not in a shape of (num_envs, ), maybe try to revise the function or to reshape using `tensor.squeeze()`
+3. If it is no module error, revise your codes without import any unknown python packages.

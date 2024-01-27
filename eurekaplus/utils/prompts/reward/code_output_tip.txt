@@ -11,5 +11,5 @@ Some helpful tips for writing the reward function code:
     (7) The code output should be formatted as a python code string: "```python ... ```" for easy extraction.
     (8) DO NOT sum sub-rewards by yourself, just provide every sub-reward function. They will be handled inplicitly by the code framework.
     (9) Each new defined sub-reward function should output a reward tensor of a shape (num_envs, ), call `tensor.squeeze()` to convert to this shape but only when necessary.
-    (10) Define your own reward functions first, and follow the signature to include them in `RewardsCfg` as shown.
-    (11) `RewTerm`, `RLTaskEnv`, and `configclass`, etc, are already defined. Do not try to import them.
+    (10) Define your own reward functions first, and follow the signature to include them in `RewardsCfg` as shown. Remember to put all codes together as a whole python block.
+    (11) `RewTerm`, `RLTaskEnv`, and `configclass`, etc, are already defined. Do not try to import them or any other modules by yourself.
