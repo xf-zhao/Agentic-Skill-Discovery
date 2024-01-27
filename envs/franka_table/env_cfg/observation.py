@@ -62,6 +62,14 @@ class ObservationsCfg:
             - The robot gripper is initially open. It is bigger than the cubes but smaller than plates and the drawer.
             - The variable `target_pose_on_table` indicates a specific target position on the table, which is meant for goal-conditioned policy learning. Also use this one instead of coming up with a new variable. This pose variable contains 3 position and 4 quaternions.
 
+        Use obs_buf and prev_obs_buf to access current and previous observations, respectively.
+        For example:
+
+        obs = env.obs_buf["observations"]
+        prev_obs = env.prev_obs_buf["observations"]
+        cube_a_height = obs["cube_a_position"][:, 2]
+        prev_cube_a_height = prev_obs["cube_a_position"][:, 2]
+
         """
 
         # robot joint positions, in a shape of (9, ), including 7 DoF and 2 for the two finger-gripper joints.
@@ -109,7 +117,7 @@ class ObservationsCfg:
         )
 
         # Randomly initialized target pose to play with. It is in the shape of (num_envs, 7).
-        # Later use `env.observations['target_pose_on_table'][:, :3]` for position and `env.observations['target_pose_on_table'][:, 3:]` for quatenion orentation inside the function computation.
+        # Later use `env.obs_buf['observations']['target_pose_on_table'][:, :3]` for position and `env.obs_buf['observations']['target_pose_on_table'][:, 3:]` for quatenion orentation inside the function computation.
         target_pose_on_table = ObsTerm(
             func=mdp.generated_commands, params={"command_name": "target_pose_on_table"}
         )
