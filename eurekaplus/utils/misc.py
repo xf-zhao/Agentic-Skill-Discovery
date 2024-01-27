@@ -20,11 +20,9 @@ def get_freest_gpu():
     return freest_gpu['index']
 
 def filter_traceback(s, idx=None):
-    lines = s.split('\n')
-    for i, line in enumerate(lines):
-        if 'Learning iteration 0/' in line:
-            return ''
-    pattern = r'(Traceback.*?Error:\s.*?\n)'
+    if 'Learning iteration 0/' in s:
+        return ''
+    pattern = r'(Traceback.*Error:\s.*?\n)'
     traceback_msgs = re.findall(pattern, s, re.DOTALL)
     if len(traceback_msgs) > 0:
         logging.warning(f'Some env contains errors to import, may hinder this run.')
@@ -32,6 +30,7 @@ def filter_traceback(s, idx=None):
             for msg in traceback_msgs:
                 if idx in msg:
                     return msg
+        return traceback_msgs[0]
     return ''  # Return an empty string if no Traceback is found
 
 

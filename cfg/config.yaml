@@ -15,14 +15,14 @@ temperature: 0.7
 suffix: _GPT  # suffix for generated files (indicates LLM model)
 debug: False
 num_envs: 2048
-max_iterations: 500 # RL Policy training iterations (decrease this to make the feedback loop faster)
+max_iterations: 100 # RL Policy training iterations (decrease this to make the feedback loop faster)
 headless: True
 video: False
 memory_requirement: 4
 
 # Eureka parameters
 iteration: 1 # how many iterations of Eureka to run
-n_reward_samples: 1 # number of samples to generate reward function per iteration
+n_reward_samples: 2 # number of samples to generate reward function per iteration
 n_success_samples: 1 # number of samples to generate success function per iteration
 num_eval: 4 # number of evaluation episodes to run for the final reward
 capture_video: False # whether to capture policy rollout videos

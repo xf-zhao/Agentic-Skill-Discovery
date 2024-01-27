@@ -257,7 +257,7 @@ def gpt_call(
     logging.info(
         f">>> Prompt Tokens: {prompt_tokens}, Completion Tokens: {total_completion_token}, Total Tokens: {total_token}"
     )
-    return responses, total_samples, total_completion_token, total_token
+    return responses
 
 
 def extract_code_string(response, combine_all=False):
@@ -369,7 +369,7 @@ class Node:
             gpt_err = False
             for _ in range(5):
                 if response is None:
-                    responses, *_ = gpt_call(
+                    responses = gpt_call(
                         messages=messages,
                         model=self.model,
                         n_samples=1,
@@ -585,18 +585,15 @@ class RewardNode(Node):
     def _block_until_training(self, log_status=False):
         # Ensure that the RL training has started before moving on
         while True:
+            time.sleep(3)
             rl_log = file_to_string(self.rl_filepath)
-            if "Learning iteration 0/" in rl_log or "Traceback" in rl_log:
-                if log_status and "Learning iteration 0/" in rl_log:
-                    logging.info(
-                        f"Iteration {self.ite}: Code Run {self.idx} successfully training!"
-                    )
-                if log_status and "Traceback" in rl_log:
-                    logging.info(
-                        f"Iteration {self.ite}: Code Run {self.idx} execution error!"
-                    )
-                logging.info(f"Log at {self.rl_filepath}")
-                break
+            msg = filter_traceback(rl_log)
+            if msg == '':
+                logging.info(f"Iteration {self.iterations} - node {self.idx}: successfully launched RL training.")
+            else:
+                logging.error(f"Iteration {self.iterations} - node {self.idx}: failed to launch RL training!")
+            logging.info(f"Log at {self.rl_filepath}")
+            break
         return
 
     def _summarize_runlog(self):
@@ -719,7 +716,7 @@ class SuccessNode(Node):
         memory_requirement=10,
     ) -> List[RewardNode]:
         self.children: List[RewardNode] = []
-        responses, *_ = gpt_call(
+        responses = gpt_call(
             messages=self.messages,
             model=self.model,
             n_samples=self.n_samples,
@@ -892,7 +889,7 @@ class TaskNode(Node):
     def propose(
         self, iterations=3, n_samples=3, temperature=0, model="gpt-3.5-turbo"
     ) -> List[SuccessNode]:
-        responses, *_ = gpt_call(
+        responses = gpt_call(
             messages=self.messages,
             model=self.model,
             n_samples=self.n_samples,
@@ -985,7 +982,7 @@ Task 10: Pick up Cube B and place it on top of Cube A.
         self, n_samples=1, temperature=0, model="gpt-3.5-turbo"
     ) -> List[TaskNode]:
         messages = self.messages
-        responses, *_ = gpt_call(
+        responses = gpt_call(
             messages=messages,
             model=self.model,
             n_samples=1,
@@ -1030,15 +1027,15 @@ def main(cfg):
     for i in range(cfg.iteration):
         logging.info(f"Iteration {i}: Generating with {model}")
         task_nodes = env_node.propose_fake(
-            n_samples=2, temperature=cfg.temperature, model=model
+            n_samples=cfg.n_success_samples, temperature=cfg.temperature, model=model
         )
         # task_nodes = env_node.propose()
         for task_node in task_nodes:
             break
         success_nodes = task_node.propose(
-            n_samples=3, iterations=2, temperature=cfg.temperature, model=model
+            n_samples=cfg.n_reward_samples, iterations=2, temperature=cfg.temperature, model=model
         )  # params for child init
-        for i in range(2):
+        for i in range(cfg.iterations):
             for success_node in success_nodes:
                 reward_nodes = success_node.propose(
                     num_envs=num_envs,
