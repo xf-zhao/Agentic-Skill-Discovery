@@ -33,6 +33,9 @@ parser.add_argument(
     "--video", action="store_true", default=False, help="Record videos during training."
 )
 parser.add_argument(
+    "--log_root", type=str, default=None, help="Saved model path."
+)
+parser.add_argument(
     "--video_length",
     type=int,
     default=200,
@@ -81,6 +84,11 @@ from omni.isaac.orbit_tasks.utils.wrappers.rsl_rl import (
     export_policy_as_onnx,
 )
 
+import sys
+
+dirname = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, dirname)
+
 import envs, envs_gpt  # noqa: F401
 
 
@@ -95,7 +103,7 @@ def main():
     )
 
     # specify directory for logging experiments
-    log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
+    log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name) if args_cli.log_root is None else args_cli.log_root
     log_root_path = os.path.abspath(log_root_path)
     print(f"[INFO] Loading experiment from directory: {log_root_path}")
     resume_path = get_checkpoint_path(

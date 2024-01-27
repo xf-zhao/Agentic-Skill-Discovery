@@ -599,12 +599,14 @@ class RewardNode(Node):
             "--num_envs",
             "1",
             "--video",
+            "--log_root",
+            self.log_dir,
         ]
         if self.headless:
             rl_run_command.append("--headless")
             rl_run_command.append("--offscreen_render")
         self.play_filepath = self.rl_filepath.rstrip(".txt") + "_play.txt"
-        with open(self.play_filepath + "_play", "w") as f:
+        with open(self.play_filepath, "w") as f:
             self.rl_run = subprocess.Popen(
                 rl_run_command,
                 stdout=f,
@@ -618,7 +620,7 @@ class RewardNode(Node):
         self.summary = summary
         return self
 
-    def _block_until_training(self, log_status=False):
+    def _block_until_training(self):
         # Ensure that the RL training has started before moving on
         while True:
             time.sleep(3)
