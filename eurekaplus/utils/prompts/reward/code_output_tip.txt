@@ -13,4 +13,3 @@ Some helpful tips for writing the reward function code:
     (9) Each new defined sub-reward function should output a reward tensor of a shape (num_envs, ), call `tensor.squeeze()` to convert to this shape but only when necessary.
     (10) Define your own reward functions first, and follow the signature to include them in `RewardsCfg` as shown.
     (11) `RewTerm`, `RLTaskEnv`, and `configclass`, etc, are already defined. Do not try to import them or any other modules by yourself.
-    (12) Finally, remember to organize all codes as a whole python block for easy copy.

@@ -9,4 +9,3 @@ Some helpful tips for writing the success function code:
     (5) Do not try access observations or have any variable outside the scope of sub-reward function.
     (6) Configure class `SuccessCfg` with the new defined success function as shown in the signature. 
     (7) `RewTerm`, `RLTaskEnv`, and `configclass`, etc, are already defined. Do not try to import them or any other modules by yourself.
-    (8) Finally, remember to organize all codes as a whole python block for easy copy.

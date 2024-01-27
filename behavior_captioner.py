@@ -2,9 +2,11 @@ import imageio.v3 as iio
 import base64
 import requests
 import openai
+import os
 
 
-def video_to_frames(video_file):
+def video_to_frames(video_file, save=True):
+    file_dir = os.path.dirname(video_file)
     frames = iio.imread(video_file)
     start_frame, end_frame = frames[0], frames[-1]
     return start_frame, end_frame
@@ -40,7 +42,4 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
-
-log_dir = ""
-frames = video_to_frames(log_dir + "/rl-video-step-0.mp4")
-gptv_call(frames)
+# video_to_frames()

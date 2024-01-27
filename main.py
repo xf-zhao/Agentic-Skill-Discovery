@@ -18,6 +18,7 @@ from eurekaplus.utils.file_utils import find_files_with_substring, load_tensorbo
 from eurekaplus.utils.create_task import create_task
 from eurekaplus.utils.extract_task_code import *
 from typing import List
+from behavior_captioner import video_to_frames
 
 
 DUMMY_FAILURE = -10000.0
@@ -241,7 +242,7 @@ def gpt_call(
                     print("Current Chunk Size", chunk_size)
                 err_msg = f"Attempt {attempt+1} failed with error: {e}"
                 logging.info(err_msg)
-                if 'maximum context length' in err_msg:
+                if "maximum context length" in err_msg:
                     responses = None
                     return
                 time.sleep(1)
@@ -316,7 +317,7 @@ class Node:
         self.response = response
         self.code = code
         self.summary = None
-        self.ite = 1
+        self.ite = 0
         self.env_file = (
             f"{self.root_dir}/envs/{self.env_name}/env_cfg/{self.env_name}_env_cfg.py"
         )
@@ -404,6 +405,7 @@ class Node:
             "@configclass": "",
             "RLTaskEnv": "object",
             "@torch.jit.script": "",
+            "@staticmethod": "",
         },
         prefix_codes="import torch\n\n",
         remove_temp=False,
@@ -468,6 +470,7 @@ class RewardNode(Node):
         self.num_envs = num_envs
         self.rl_run = None
         self.rl_filepath = None
+        self.play_filepath = None
         self.memory_requirement = memory_requirement
         self.policy_feedback = file_to_string(
             f"{self.prompt_dir}/reward/policy_feedback.txt"
@@ -475,8 +478,12 @@ class RewardNode(Node):
         self.code_feedback = file_to_string(
             f"{self.prompt_dir}/reward/code_feedback.txt"
         )
+        self.execution_error_feedback = file_to_string(
+            f"{self.prompt_dir}/reward/execution_error_feedback.txt"
+        )
         self.cur_env_dir = None
         self.max_iterations = max_iterations
+        self.priors = []
 
     def init(self):
         super().init()
@@ -485,9 +492,9 @@ class RewardNode(Node):
             f"{self.parent.parent.idx}-{self.parent.idx}-{self.idx}-{self.ite}.txt"
         )
         self.cur_env_dir = cur_env_dir
-        self.log_dir =f'{self.cur_env_dir}/logs'
+        self.log_dir = f"{self.cur_env_dir}/logs"
         if os.path.exists(cur_env_dir):
-            os.removedirs(cur_env_dir)
+            shutil.rmtree(cur_env_dir)
             logging.info(f"Remove directory {cur_env_dir}.")
         os.makedirs(cur_env_dir)
 
@@ -519,11 +526,11 @@ class RewardNode(Node):
         self.unlink()
         cur_env_dir = self.cur_env_dir
         if os.path.exists(cur_env_dir):
-            os.removedirs(cur_env_dir)
+            shutil.rmtree(cur_env_dir)
             logging.info(f"Removed node {self.idx} and its directory {cur_env_dir}.")
         return
 
-    def run(self):
+    def _prepare_launch(self):
         # Only run when memory is enough
         max_waiting = 60 * 60 * 4 // 10
         for i in range(
@@ -545,6 +552,10 @@ class RewardNode(Node):
 
         # Find the freest GPU to run GPU-accelerated RL
         set_freest_gpu()
+        return
+
+    def run(self):
+        self._prepare_launch()
 
         # Execute the python file with flags
         rl_run_command = [
@@ -575,7 +586,32 @@ class RewardNode(Node):
         self._block_until_training(log_status=True)
         return self
 
-    # def propose(self):
+    def play(self):
+        self._prepare_launch()
+
+        # Execute the python file with flags
+        rl_run_command = [
+            f"{ORBIT_ROOT_DIR}/orbit.sh",
+            "-p",
+            f"{self.root_dir}/rsl_rl/play.py",
+            "--task",
+            f"{self.idx}",
+            "--num_envs",
+            "1",
+            "--video",
+        ]
+        if self.headless:
+            rl_run_command.append("--headless")
+            rl_run_command.append("--offscreen_render")
+        self.play_filepath = self.rl_filepath.rstrip(".txt") + "_play.txt"
+        with open(self.play_filepath + "_play", "w") as f:
+            self.rl_run = subprocess.Popen(
+                rl_run_command,
+                stdout=f,
+                stderr=f,
+            )
+        behavior_image_paths = self._block_until_play_recorded()
+        return behavior_image_paths
 
     def summarize(self):
         summary = self._summarize_runlog()
@@ -588,13 +624,29 @@ class RewardNode(Node):
             time.sleep(3)
             rl_log = file_to_string(self.rl_filepath)
             msg = filter_traceback(rl_log)
-            if msg == '':
-                logging.info(f"Iteration {self.iterations} - node {self.idx}: successfully launched RL training.")
+            if msg is None:
+                continue
+            elif msg == "":
+                logging.info(
+                    f"Iteration {self.iterations} - node {self.idx}: successfully launched RL training."
+                )
             else:
-                logging.error(f"Iteration {self.iterations} - node {self.idx}: failed to launch RL training!")
+                logging.error(
+                    f"Iteration {self.iterations} - node {self.idx}: execution error!"
+                )
             logging.info(f"Log at {self.rl_filepath}")
             break
         return
+
+    def _block_until_play_recorded(self):
+        image_paths = None
+        for _ in range(60 * 5):  # 5 mins throw error
+            time.sleep(1)
+            play_video = self.log_dir + "/rl-video-step-0.mp4"
+            if os.path.exists(play_video):
+                frames = video_to_frames(play_video)
+                break
+        return image_paths
 
     def _summarize_runlog(self):
         self.rl_run.communicate()
@@ -611,16 +663,17 @@ class RewardNode(Node):
             with open(self.rl_filepath, "r") as f:
                 stdout_str = f.read()
         except:
-            content = self.parent.execution_error_feedback.format(
+            content = self.execution_error_feedback.format(
                 traceback_msg="Code Run cannot be executed due to function signature error! Please re-write an entirely new reward function!"
             )
             return summary
 
         traceback_msg = filter_traceback(stdout_str)
+        assert traceback_msg is not None
         if traceback_msg == "":
             # If RL execution has no error, provide policy statistics feedback
             exec_success = True
-            success_reward_key = "Episode Reward"
+            success_reward_key = "Episode Reward/success"
             lines = stdout_str.split("\n")
             for i, line in enumerate(lines):
                 if line.startswith("Log Directory:"):
@@ -644,12 +697,12 @@ class RewardNode(Node):
                     metric_cur_mean = sum(tensorboard_logs[metric]) / len(
                         tensorboard_logs[metric]
                     )
-                    if success_reward_key == metric:
-                        success = metric_cur_max
+                    if success_reward_key != metric:
                         metric_name = f"Reward component `{metric}`"
                     else:
+                        success = metric_cur_max
                         metric_name = "Success score"
-                        content += f"{metric_name}: {metric_cur}, Max: {metric_cur_max:.2f}, Mean: {metric_cur_mean:.2f}, Min: {metric_cur_min:.2f} \n"
+                    content += f"{metric_name}: {metric_cur}, Max: {metric_cur_max:.2f}, Mean: {metric_cur_mean:.2f}, Min: {metric_cur_min:.2f} \n"
         else:
             # Otherwise, provide execution traceback error feedback
             success = DUMMY_FAILURE
@@ -685,6 +738,7 @@ class SuccessNode(Node):
         )
         self.max_success_overall = DUMMY_FAILURE
         self.max_reward_idx = None
+        self.best_node = None
         self.stats = {
             "max_success": [],
             "execute_rate": [],
@@ -732,6 +786,7 @@ class SuccessNode(Node):
                 replacements={
                     REWARD_REPLACE_INPUT: REWARD_REPLACE_OUTPUT,
                     "@torch.jit.script": "",
+                    "@staticmethod": "",
                 },
             )
             if not no_err:
@@ -756,13 +811,12 @@ class SuccessNode(Node):
             child.summarize()
         exec_successes = [child.summary["exec_success"] for child in self.children]
         any_success = np.sum(exec_successes) > 0
-        # Repeat the iteration if all code generation failed
+        stat = {
+            "execute_rate": 0.0,
+            "max_success": DUMMY_FAILURE,
+            "max_reward_idx": None,
+        }
         if not any_success:  # and cfg.sample != 1:
-            stat = {
-                "execute_rate": 0.0,
-                "max_success": DUMMY_FAILURE,
-                "max_reward_idx": None,
-            }
             logging.info(
                 "All code generation failed! Repeat this iteration from the current message checkpoint!"
             )
@@ -787,11 +841,7 @@ class SuccessNode(Node):
         max_success = best_node.summary["success"]
         execute_rate = np.sum(np.array(successes) >= 0.0) / self.n_samples
 
-        # Update the best Eureka Output
-        if max_success > self.max_success_overall:
-            self.max_success_overall = max_success
-            self.max_reward_idx = best_node.idx
-
+        self.ite += 1
         logging.info(
             f"Iteration {self.ite}: Max Success: {max_success}, Execute Rate: {execute_rate}"
         )
@@ -806,7 +856,13 @@ class SuccessNode(Node):
             + best_node.summary["content"]
             + "\n"
         )
-        self.ite += 1
+        if self.best_node is not None:
+            best_node.priors = [*self.best_node.priors, self.best_node.idx]
+        # Update the best Eureka Output
+        if max_success > self.max_success_overall:
+            self.max_success_overall = max_success
+            self.max_reward_idx = best_node.idx
+            self.best_node = best_node
         self._collect_stat(execute_rate, max_success, self.max_reward_idx)
         return any_success, stat
 
@@ -921,6 +977,11 @@ class TaskNode(Node):
             child.init()
         return self.children
 
+    def collect(self):
+        for success_child in self.children:
+            success_child.best_node.play()
+        return
+
 
 class EnvNode(Node):
     def __init__(self, *args, **kwargs) -> None:
@@ -1033,9 +1094,12 @@ def main(cfg):
         for task_node in task_nodes:
             break
         success_nodes = task_node.propose(
-            n_samples=cfg.n_reward_samples, iterations=2, temperature=cfg.temperature, model=model
+            n_samples=cfg.n_reward_samples,
+            iterations=2,
+            temperature=cfg.temperature,
+            model=model,
         )  # params for child init
-        for i in range(cfg.iterations):
+        for i in range(1):
             for success_node in success_nodes:
                 reward_nodes = success_node.propose(
                     num_envs=num_envs,

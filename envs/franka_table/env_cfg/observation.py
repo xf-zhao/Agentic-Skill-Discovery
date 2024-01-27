@@ -64,10 +64,10 @@ class ObservationsCfg:
 
         """
 
-        # robot joint positions
+        # robot joint positions, in a shape of (9, ), including 7 DoF and 2 for the two finger-gripper joints.
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
 
-        # robot joint velocities
+        # robot joint velocities, in a shape of (9, ), including 7 DoF and 2 for the two finger-gripper joints.
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
 
         # robot end-effector position
