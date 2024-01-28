@@ -1,6 +1,7 @@
 import hydra
 import numpy as np
 import json
+import networkx as nx
 import psutil
 import logging
 import matplotlib.pyplot as plt
@@ -291,6 +292,7 @@ def extract_code_string(response, combine_all=False):
 class Node:
     def __init__(
         self,
+        type=None,
         messages=None,
         response=None,
         code=None,
@@ -300,11 +302,12 @@ class Node:
         model="gpt-3.5-turbo",
         n_samples=1,
         temperature=0,
+        ite=0,
     ) -> None:
         self.root_dir = root_dir if root_dir is not None else ZEROHERO_ROOT_DIR
         self.prompt_dir = f"{self.root_dir}/eurekaplus/utils/prompts"
         self.env_name = env_name
-        self.type = None
+        self.type = type
         self.parent = None
         self.children = []
         self.iterations = iterations
@@ -317,7 +320,7 @@ class Node:
         self.response = response
         self.code = code
         self.summary = None
-        self.ite = 0
+        self.ite = ite
         self.env_file = (
             f"{self.root_dir}/envs/{self.env_name}/env_cfg/{self.env_name}_env_cfg.py"
         )
@@ -333,12 +336,38 @@ class Node:
         )
 
     def init(self):
-        self.idx = f"{self.type[0]}{uuid.uuid4().hex[:8]}"
+        if self.idx is None:
+            self.idx = f"{self.type[0]}{uuid.uuid4().hex[:8]}"
         return self
 
     def add_child(self, child):
         child.parent = self
         self.children.append(child)
+
+    def _update_self_with_node(self, node):
+        self.type = node["type"]
+        self.idx = node["id"]
+        self.ite = node["ite"]
+        self.messages = node["messages"]
+        self.response = node["response"]
+        self.code = node["code"]
+        return
+
+    def _add_node_to_graph(self, node):
+        node_type = node.type
+        data = dict(
+            type=node_type,
+            messages=node.messages,
+            response=node.response,
+            code=node.code,
+            ite=node.ite,
+        )
+        if node_type == "Success":
+            data.update({"best_reward": node.best_reward.idx, "stats": node.stats})
+        elif node_type == "Task":
+            data.update({"best_success": node.best_success.idx})
+        self.G.add_node(node.idx, **data)
+        return
 
     def propose(self):
         raise NotImplementedError
@@ -583,7 +612,7 @@ class RewardNode(Node):
                 stdout=f,
                 stderr=f,
             )
-        self._block_until_training(log_status=True)
+        self._block_until_training()
         return self
 
     def play(self):
@@ -720,7 +749,9 @@ class RewardNode(Node):
 
 
 class SuccessNode(Node):
-    def __init__(self, task=None, *args, **kwargs) -> None:
+    def __init__(
+        self, task=None, best_reward=None, stats=None, *args, **kwargs
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Success"
         self.task = task
@@ -739,12 +770,10 @@ class SuccessNode(Node):
             f"{self.prompt_dir}/reward/code_output_tip.txt"
         )
         self.max_success_overall = DUMMY_FAILURE
-        self.max_reward_idx = None
-        self.best_node = None
+        self.best_reward = best_reward
         self.stats = {
             "max_success": [],
             "execute_rate": [],
-            "max_reward_idx": [],
         }
 
     def init(self):
@@ -816,7 +845,6 @@ class SuccessNode(Node):
         stat = {
             "execute_rate": 0.0,
             "max_success": DUMMY_FAILURE,
-            "max_reward_idx": None,
         }
         if not any_success:  # and cfg.sample != 1:
             logging.info(
@@ -827,20 +855,24 @@ class SuccessNode(Node):
         successes = [child.summary["success"] for child in self.children]
         # Select the best code sample based on the success rate
         best_sample_idx = np.argmax(np.array(successes))
-        best_node = self.children[best_sample_idx]
+        best_reward = self.children[best_sample_idx]
         for i, child in enumerate(self.children):
             if i != best_sample_idx:
                 child.remove()
-        best_node.unlink()
+        best_reward.unlink()
         self.children = []
         feedback = self._wrap_user_message(
-            best_node.summary["content"] + self.code_feedback
+            best_reward.summary["content"] + self.code_feedback
         )
-        self.messages = [*best_node.messages, best_node.response["message"], feedback]
+        self.messages = [
+            *best_reward.messages,
+            best_reward.response["message"],
+            feedback,
+        ]
         self.response = None
 
         # some statistic report
-        max_success = best_node.summary["success"]
+        max_success = best_reward.summary["success"]
         execute_rate = np.sum(np.array(successes) >= 0.0) / self.n_samples
 
         self.ite += 1
@@ -850,22 +882,21 @@ class SuccessNode(Node):
         logging.info(f"Iteration {self.ite}: Best Generation ID: {best_sample_idx}")
         logging.info(
             f"Iteration {self.ite}: GPT Output Content:\n"
-            + best_node.response["message"]["content"]
+            + best_reward.response["message"]["content"]
             + "\n"
         )
         logging.info(
             f"Iteration {self.ite}: User Content:\n"
-            + best_node.summary["content"]
+            + best_reward.summary["content"]
             + "\n"
         )
-        if self.best_node is not None:
-            best_node.priors = [*self.best_node.priors, self.best_node.idx]
+        if self.best_reward is not None:
+            best_reward.priors = [*self.best_reward.priors, self.best_reward.idx]
         # Update the best Eureka Output
         if max_success > self.max_success_overall:
             self.max_success_overall = max_success
-            self.max_reward_idx = best_node.idx
-            self.best_node = best_node
-        self._collect_stat(execute_rate, max_success, self.max_reward_idx)
+            self.best_reward = best_reward
+        self._collect_stat(execute_rate, max_success)
         return any_success, stat
 
     def analyze_stats(self):
@@ -876,7 +907,6 @@ class SuccessNode(Node):
 
         max_successes = stats["max_success"]
         execute_rates = stats["execute_rate"]
-        max_reward_idxs = stats["max_reward_idx"]
 
         x_axis = np.arange(len(max_successes))
         axs[0].plot(x_axis, np.array(max_successes))
@@ -891,15 +921,13 @@ class SuccessNode(Node):
             "summary.npz",
             max_successes=max_successes,
             execute_rates=execute_rates,
-            max_reward_idx=max_reward_idxs,
         )
         return
 
-    def _collect_stat(self, execute_rate, max_success, max_reward_idx):
+    def _collect_stat(self, execute_rate, max_success):
         stat = {
             "execute_rate": execute_rate,
             "max_success": max_success,
-            "max_reward_idx": max_reward_idx,
         }
         for k, v in stat.items():
             self.stats[k].append(v)
@@ -981,13 +1009,18 @@ class TaskNode(Node):
 
     def collect(self):
         for success_child in self.children:
-            success_child.best_node.play()
+            success_child.best_reward.play()
         return
 
 
 class EnvNode(Node):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(
+        self, idx="E00", resume=True, graph_output=None, *args, **kwargs
+    ) -> None:
         super().__init__(*args, **kwargs)
+        self.idx = idx
+        self.resume = resume
+        self.G = nx.DiGraph()
         self.type = "Env"
         self.code = None
         self.initial_system = file_to_string(
@@ -998,6 +1031,12 @@ class EnvNode(Node):
         self.code_output_tip = file_to_string(
             f"{self.prompt_dir}/task/code_output_tip.txt"
         )
+        if graph_output is None:
+            graph_dir = f"{self.root_dir}/envs_gpt/graphs"
+            graph_output = f"{graph_dir}/{self.env_name}_{self.idx}.json"
+            if not os.path.exists(graph_dir):
+                os.makedirs(graph_dir)
+        self.graph_output = graph_output
 
     def init(self):
         super().init()
@@ -1065,6 +1104,57 @@ Task 10: Pick up Cube B and place it on top of Cube A.
             child.init()
         return self.children
 
+    def save_graph(self):
+        G = self.G
+        self._add_node_to_graph(self)
+        for task_node in self.children:
+            self._add_node_to_graph(task_node)
+            G.add_edge(self.idx, task_node.idx)
+            for success_node in task_node.children:
+                self._add_node_to_graph(success_node)
+                G.add_edge(task_node.idx, success_node.idx)
+                for reward_node in success_node.children:
+                    self._add_node_to_graph(reward_node)
+                    G.add_edge(success_node.idx, reward_node)
+        G_dict = nx.node_link_data(G)
+        with open(self.graph_output, "w") as fout:
+            data_json = json.dumps(G_dict)
+            fout.write(data_json + "\n")
+            logging.info(f"Saved graph {self.idx} to {self.graph_output}")
+        return
+
+    def load_graph(self, graph_input=None):
+        if not self.resume:
+            logging.info(
+                f"Run in no-resume mode. Creating/Overwriting a new graph {graph_input}."
+            )
+            return self
+        if graph_input is None:
+            graph_input = self.graph_output
+        if not os.path.exists(graph_input):
+            logging.info(f"No graph found in {graph_input}, creating a new one.")
+            return self
+        with open(graph_input, "r") as fin:
+            data = json.load(fin)
+        if graph_input is not None:
+            for node in data["nodes"]:
+                assert node["type"] == "Env"
+                self._update_self_with_node(node)
+                break
+        G = nx.node_link_graph(data)
+        self.G = G
+        for task_idx in G.neighbors(self.idx):
+            task_node = TaskNode(**G.nodes[task_idx])
+            self.add_child(task_node)
+            for success_idx in G.neighbors(task_idx):
+                success_node = SuccessNode(**G.nodes[success_idx])
+                task_node.add_child(success_node)
+                for reward_idx in G.neighbors(success_idx):
+                    reward_node = RewardNode(**G.nodes[reward_idx])
+                    success_node.add_child(reward_node)
+        logging.info(f"Loaded graph {graph_input}.")
+        return self
+
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")
 def main(cfg):
@@ -1079,12 +1169,17 @@ def main(cfg):
 
     env_name = cfg.env.env_name.lower()
     num_envs = 11 if cfg.debug else cfg.num_envs
-    env_node = EnvNode(
-        env_name=env_name,
-        model=model,
-        n_samples=1,
-        temperature=cfg.temperature,
-    ).init()
+    env_node = (
+        EnvNode(
+            env_name=env_name,
+            resume=cfg.resume,
+            model=model,
+            n_samples=1,
+            temperature=cfg.temperature,
+        )
+        .init()
+        .load_graph()
+    )
 
     # Eureka-plus generation loop
     for i in range(cfg.iteration):
@@ -1114,6 +1209,8 @@ def main(cfg):
                     node.run()
             for success_node in success_nodes:
                 success_node.collect()
+        env_node.save_graph()
+        env_node.load_graph()
         task_node.collect()  # check behavior caption
 
 
