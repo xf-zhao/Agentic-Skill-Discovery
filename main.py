@@ -1117,20 +1117,26 @@ class EnvNode(Node):
     def num_impossibles(self):
         return len(self.impossibles)
 
+    def get_skill_list(self):
+        _skill_list_str = "\n".join(
+                [f"({i+1}) {skill}" for i, skill in enumerate(self.skills)]
+            )
+        return _skill_list_str
+
+    def get_impossible_list(self):
+        _im_list_str = "\n".join(
+                [f"({i+1}) {im}" for i, im in enumerate(self.impossibles)]
+            )
+        return _im_list_str
+
     def init(self):
         super().init()
         if self.num_skills > 0:
-            _skill_list_str = "\n".join(
-                [f"({i+1}) {skill}" for i, skill in enumerate(self.skills)]
-            )
-            skill_list_str = f"We have already acquired {self.num_skills} skills:\n{_skill_list_str}\n"
+            skill_list_str = f"We have already acquired {self.num_skills} skills:\n{self.get_skill_list()}\n"
         else:
             skill_list_str = ""
         if self.num_impossibles > 0:
-            _im_list_str = "\n".join(
-                [f"({i+1}) {im}" for i, im in enumerate(self.impossibles)]
-            )
-            im_list_str = f"Previously we tried but failed to learn the following {self.num_impossibles} skills:\n{_im_list_str}\nMaybe consider to propose easier or clearer tasks.\n"
+            im_list_str = f"Previously we tried but failed to learn the following {self.num_impossibles} skills:\n{self.get_impossible_list()}\nMaybe consider to propose easier or clearer tasks.\n"
         else:
             im_list_str = ""
         initial_system = (
@@ -1166,6 +1172,8 @@ class EnvNode(Node):
             )
             self.add_child(child)
             child.init()
+            # One task each time
+            break
         return self.children
 
     def save_graph(self):
@@ -1254,11 +1262,47 @@ class EnvNode(Node):
             logging.info(
                 f"Collected new skill {child.code} with {child.num_variants} variants."
             )
-        else:
+        elif child.num_variants == 0:
             self.impossibles.append(child.code)
             logging.info(f"Mission impossible on {child.code}.")
+        else:
+            pass
         return
 
+
+def learn_next_skill(env_node, cfg, bc):
+    task_nodes = env_node.propose(
+        n_samples=cfg.n_success_samples, temperature=cfg.temperature, model=cfg.model
+    )
+    for task_node in task_nodes:
+        logging.info(f'Learn-Next-Skill: {task_node.code}.')
+        break
+    for _ in range(cfg.task_iterations):
+        if task_node.num_variants >= cfg.num_variants:
+            continue
+        success_nodes = task_node.propose(
+            n_samples=cfg.n_reward_samples,
+            iterations=2,
+            temperature=cfg.temperature,
+            model=cfg.model,
+        )  # params for child init
+        for __ in range(cfg.reward_iterations):
+            for success_node in success_nodes:
+                reward_nodes = success_node.propose(
+                    num_envs=cfg.num_envs,
+                    headless=cfg.headless,
+                    video=cfg.video,
+                    memory_requirement=cfg.memory_requirement,
+                    max_iterations=cfg.max_iterations,
+                )
+                for node in reward_nodes:
+                    node.run()
+            for success_node in success_nodes:
+                success_node.collect()
+        task_node.collect(behavior_captioner=bc)  # check behavior caption
+    env_node.collect()
+    env_node.save_graph()
+    return env_node
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")
 def main(cfg):
@@ -1270,10 +1314,8 @@ def main(cfg):
     model = cfg.model
     logging.info(cfg)
     logging.info(f"Using LLM: {model}")
-    logging.info("Env: " + env.env_name)
 
     env_name = cfg.env.env_name.lower()
-    num_envs = 11 if cfg.debug else cfg.num_envs
     env_node = (
         EnvNode(
             idx=f"E{cfg.seed:02d}",
@@ -1288,43 +1330,20 @@ def main(cfg):
         .init()
         .load_graph()
     )
-
+    logging.info(f"Env: {env.env_name} / {env_node.idx}")
     bc = BehaviorCaptioner(
         init_sys_prompt=f"{env_node.prompt_dir}/task/behavior_context.txt",
     )
-    # Eureka-plus generation loop
-    for i in range(cfg.iteration):
-        logging.info(f"Iteration {i}: Generating with {model}")
-        # task_nodes = env_node.propose_fake( n_samples=cfg.n_success_samples, temperature=cfg.temperature, model=model)
-        task_nodes = env_node.propose(
-            n_samples=cfg.n_success_samples, temperature=cfg.temperature, model=model
-        )
-        for task_node in task_nodes:
+    for i_task in range(cfg.target_num_skills*10):
+        print('-'*100)
+        logging.info(f'{env_node.idx}/{i_task}: Acquired {env_node.num_skills} skills, gave up on {env_node.num_impossibles} impossibles.')
+        if env_node.num_skills >= cfg.target_num_skills:
+            logging.info(f'Finished accumulating {env_node.num_skills} skills.')
             break
-        success_nodes = task_node.propose(
-            n_samples=cfg.n_reward_samples,
-            iterations=2,
-            temperature=cfg.temperature,
-            model=model,
-        )  # params for child init
-        for i in range(1):
-            for success_node in success_nodes:
-                reward_nodes = success_node.propose(
-                    num_envs=num_envs,
-                    headless=cfg.headless,
-                    video=cfg.video,
-                    memory_requirement=cfg.memory_requirement,
-                    max_iterations=cfg.max_iterations,
-                )
-                for node in reward_nodes:
-                    node.run()
-            for success_node in success_nodes:
-                success_node.collect()
-        task_node.collect(behavior_captioner=bc)  # check behavior caption
-    env_node.collect()
-    env_node.save_graph()
+        learn_next_skill(env_node, cfg, bc)
+    logging.info(f'Acquired {env_node.num_skills} skills: {env_node.get_skill_list()}')
+    logging.info(f'Gave up on {env_node.num_impossibles} impossibiles: {env_node.get_impossible_list()}')
     logging.info("All done!")
-
 
 if __name__ == "__main__":
     main()

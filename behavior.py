@@ -64,14 +64,15 @@ class BehaviorCaptioner:
         msg = self.describe(image_paths=image_paths, task=task)
         description = msg["message"]["content"]
         if self.save:
-            log_dir = os.path.dirname(image_paths)
+            log_dir = os.path.dirname(image_paths[0])
             with open(f"{log_dir}/caption.txt", "w") as fcap:
                 fcap.write(description)
-        succ = None
-        if "FAIL" in description:
+        if "SUCCESS" in description:
             succ = True
-        elif "SUCCESS" in description:
+        elif "FAIL" in description:
             succ = False
+        else:
+            succ = None
         return succ
 
     def make_image_content(self, image_path):

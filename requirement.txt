@@ -1,2 +1,5 @@
 imageio
 imageio-ffmpeg
+openai==0.28.0
+networkx
+numpy
