@@ -1254,6 +1254,7 @@ def main(cfg):
     openai.api_key = os.getenv("OPENAI_API_KEY")
     env = cfg.env
     model = cfg.model
+    logging.info(cfg)
     logging.info(f"Using LLM: {model}")
     logging.info("Env: " + env.env_name)
 
@@ -1261,19 +1262,17 @@ def main(cfg):
     num_envs = 11 if cfg.debug else cfg.num_envs
     env_node = (
         EnvNode(
+            idx=f"E{cfg.seed:02d}",
             env_name=env_name,
             resume=cfg.resume,
             model=model,
             n_samples=1,
             temperature=cfg.temperature,
-            skills=[
-                "Move cube A to target position",
-            ],
-            impossibles=[
-                "Pick up the plate",
-            ],
-        ).init()
-        # .load_graph()
+            skills=[],
+            impossibles=[],
+        )
+        .init()
+        .load_graph()
     )
 
     bc = BehaviorCaptioner(
@@ -1310,7 +1309,7 @@ def main(cfg):
         task_node.collect(behavior_captioner=bc)  # check behavior caption
     env_node.collect()
     env_node.save_graph()
-    logging("All done!")
+    logging.info("All done!")
 
 
 if __name__ == "__main__":

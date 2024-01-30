@@ -12,6 +12,7 @@ resume: True
 # LLM parameters
 # model: gpt-4-turbo-preview
 model: gpt-3.5-turbo  # LLM model (other options are gpt-4, gpt-4-0613, gpt-3.5-turbo-16k-0613)
+seed: 1
 temperature: 0.7
 debug: False
 num_envs: 2048
