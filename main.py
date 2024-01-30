@@ -684,22 +684,24 @@ class RewardNode(Node):
         return
 
     def _block_until_play_recorded(self):
+        image_paths = None
         pattern = r".*(Loading model checkpoint from.*)"
         for _ in range(60 * 5):  # 5 mins throw error
             play_log = file_to_string(self.play_filepath)
             model_path_reg = re.search(pattern=pattern, string=play_log)
             if model_path_reg is None:
                 time.sleep(1)
-            else:
-                video_path = (
-                    model_path_reg.group(1).split(":")[1].strip().replace(".pt", "_videos")
-                )
-                play_video = f"{video_path}/rl-video-step-0.mp4"
-                assert os.path.exists(play_video)
-                image_paths = video_to_frames(play_video)
-                logging.info(f"Processed video {play_video} into frames for GPT-4v.")
-                return image_paths
-        return
+                continue
+            video_dir = (
+                model_path_reg.group(1).split(":")[1].strip().replace(".pt", "_videos")
+            )
+            video_path = f"{video_dir}/rl-video-step-0.mp4"
+            if not os.path.exists(video_path):
+                time.sleep(1)
+                continue
+            image_paths = video_to_frames(video_path)
+            break
+        return image_paths
 
     def _summarize_runlog(self):
         self.rl_run.communicate()
@@ -885,6 +887,7 @@ class SuccessNode(Node):
                 "All code generation failed! Repeat this iteration from the current message checkpoint!"
             )
             self._collect_stat(stat)
+            self.children = []
             return any_success, stat
 
         successes = [child.summary["success"] for child in self.children]

@@ -7,6 +7,9 @@ from eurekaplus.utils.extract_task_code import file_to_string
 
 
 def video_to_frames(video_file):
+    if not os.path.exists(video_file):
+        logging.error(f'Video file {video_file} does not exist')
+        return
     file_dir = os.path.dirname(video_file)
     frames = iio.imread(video_file)
     start_frame, end_frame = frames[5], frames[-1]
@@ -17,6 +20,7 @@ def video_to_frames(video_file):
     iio.imwrite(start_frame_path, start_frame)
     iio.imwrite(end_frame_path, end_frame)
     paths = [start_frame_path, end_frame_path]
+    logging.info(f"Processed video {video_file} into frames for GPT-4v.")
     return paths
 
 
