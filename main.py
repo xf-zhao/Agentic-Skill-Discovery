@@ -610,7 +610,7 @@ class RewardNode(Node):
             "--max_iterations",
             f"{self.max_iterations}",
             "--log_dir",
-            os.path.dirname(self.log_dir),
+            self.log_dir,
         ]
         if self.headless:
             rl_run_command.append("--headless")
@@ -642,7 +642,7 @@ class RewardNode(Node):
             "1",
             "--video",
             "--log_root",
-            self.log_dir,
+            os.path.dirname(self.log_dir),
         ]
         if self.headless:
             rl_run_command.append("--headless")
@@ -1293,7 +1293,7 @@ def main(cfg):
             temperature=cfg.temperature,
             model=model,
         )  # params for child init
-        for i in range(2):
+        for i in range(1):
             for success_node in success_nodes:
                 reward_nodes = success_node.propose(
                     num_envs=num_envs,
