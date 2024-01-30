@@ -19,7 +19,7 @@ from eurekaplus.utils.file_utils import find_files_with_substring, load_tensorbo
 from eurekaplus.utils.create_task import create_task
 from eurekaplus.utils.extract_task_code import *
 from typing import List
-from behavior_captioner import video_to_frames
+from behavior import BehaviorCaptioner, video_to_frames
 
 
 DUMMY_FAILURE = -10000.0
@@ -338,6 +338,7 @@ class Node:
     def init(self):
         if self.idx is None:
             self.idx = f"{self.type[0]}{uuid.uuid4().hex[:8]}"
+        self.children = []
         return self
 
     def add_child(self, child):
@@ -363,9 +364,22 @@ class Node:
             ite=node.ite,
         )
         if node_type == "Success":
-            data.update({"best_reward": node.best_reward.idx, "stats": node.stats})
+            if node.best_reward is not None:
+                data.update(
+                    {
+                        "best_reward": {
+                            "idx": node.best_reward.idx,
+                            "priors": node.best_reward.priors,
+                            "summary": node.best_reward.summary,
+                        },
+                        "stats": node.stats,
+                    }
+                )
         elif node_type == "Task":
-            data.update({"best_success": node.best_success.idx})
+            if node.num_variants > 0:
+                data.update({"variants": [variant.idx for variant in node.variants]})
+        else:
+            pass
         self.G.add_node(node.idx, **data)
         return
 
@@ -379,7 +393,10 @@ class Node:
         raise NotImplementedError
 
     def unlink(self):
-        raise NotImplementedError
+        # self.parent.children.remove(self)
+        self.parent = None
+        self.children = []
+        return
 
     def remove(self):
         raise NotImplementedError
@@ -487,6 +504,7 @@ class RewardNode(Node):
         video=False,
         memory_requirement=16,
         max_iterations=2000,
+        priors=None,
         *args,
         **kwargs,
     ) -> None:
@@ -512,7 +530,7 @@ class RewardNode(Node):
         )
         self.cur_env_dir = None
         self.max_iterations = max_iterations
-        self.priors = []
+        self.priors = [] if priors is None else priors
 
     def init(self):
         super().init()
@@ -544,12 +562,6 @@ class RewardNode(Node):
             file.writelines(self.code + "\n")
 
         return self
-
-    def unlink(self):
-        # self.parent.children.pop(self's index)
-        self.parent = None
-        self.children = []
-        return
 
     def remove(self):
         self.unlink()
@@ -675,7 +687,7 @@ class RewardNode(Node):
             time.sleep(1)
             play_video = self.log_dir + "/rl-video-step-0.mp4"
             if os.path.exists(play_video):
-                frames = video_to_frames(play_video)
+                image_paths = video_to_frames(play_video)
                 break
         return image_paths
 
@@ -750,7 +762,12 @@ class RewardNode(Node):
 
 class SuccessNode(Node):
     def __init__(
-        self, task=None, best_reward=None, stats=None, *args, **kwargs
+        self,
+        task=None,
+        best_reward=None,
+        stats=None,
+        *args,
+        **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Success"
@@ -769,12 +786,19 @@ class SuccessNode(Node):
         self.code_output_tip = file_to_string(
             f"{self.prompt_dir}/reward/code_output_tip.txt"
         )
-        self.max_success_overall = DUMMY_FAILURE
-        self.best_reward = best_reward
-        self.stats = {
-            "max_success": [],
-            "execute_rate": [],
-        }
+
+        self.best_reward = (
+            RewardNode(**best_reward) if best_reward is not None else None
+        )
+        self.stats = (
+            {
+                "max_success_overall": DUMMY_FAILURE,
+                "execute_rate": [],
+                "max_success": [],
+            }
+            if stats is None
+            else stats
+        )
 
     def init(self):
         super().init()
@@ -850,6 +874,7 @@ class SuccessNode(Node):
             logging.info(
                 "All code generation failed! Repeat this iteration from the current message checkpoint!"
             )
+            self._collect_stat(stat)
             return any_success, stat
 
         successes = [child.summary["success"] for child in self.children]
@@ -893,10 +918,15 @@ class SuccessNode(Node):
         if self.best_reward is not None:
             best_reward.priors = [*self.best_reward.priors, self.best_reward.idx]
         # Update the best Eureka Output
-        if max_success > self.max_success_overall:
-            self.max_success_overall = max_success
+        if max_success > self.stats["max_success_overall"]:
+            self.stats["max_success_overall"] = max_success
             self.best_reward = best_reward
-        self._collect_stat(execute_rate, max_success)
+
+        stat = {
+            "execute_rate": execute_rate,
+            "max_success": max_success,
+        }
+        self._collect_stat(stat)
         return any_success, stat
 
     def analyze_stats(self):
@@ -924,18 +954,14 @@ class SuccessNode(Node):
         )
         return
 
-    def _collect_stat(self, execute_rate, max_success):
-        stat = {
-            "execute_rate": execute_rate,
-            "max_success": max_success,
-        }
+    def _collect_stat(self, stat):
         for k, v in stat.items():
             self.stats[k].append(v)
         return
 
 
 class TaskNode(Node):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, variants=None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Task"
         self.initial_system = file_to_string(
@@ -954,6 +980,11 @@ class TaskNode(Node):
         self.code_feedback = file_to_string(
             f"{self.prompt_dir}/success/code_feedback.txt"
         )
+        self.variants = [] if variants is None else variants
+
+    @property
+    def num_variants(self):
+        return len(self.variants)
 
     def init(self):
         super().init()
@@ -1007,15 +1038,37 @@ class TaskNode(Node):
             child.init()
         return self.children
 
-    def collect(self):
-        for success_child in self.children:
-            success_child.best_reward.play()
+    def collect(self, behavior_captioner: BehaviorCaptioner = None):
+        children_bak = self.children.copy()
+        self.children = []
+        for success_child in children_bak:
+            behavior_image_paths = success_child.best_reward.play()
+            succ = behavior_captioner.conclude(behavior_image_paths, task=self.code)
+            if succ:
+                self._collect_variant(success_child)
+                self.add_child(success_child)
+            else:
+                success_child.unlink()
+        return
+
+    def _collect_variant(self, child):
+        self.variants.append(child)
+        logging.info(
+            f"GPT-4v verified and collected task {self.idx} with variant success {child.idx}, best reward {child.best_reward.idx}. Current variant count: {self.num_variants}"
+        )
         return
 
 
 class EnvNode(Node):
     def __init__(
-        self, idx="E00", resume=True, graph_output=None, *args, **kwargs
+        self,
+        idx="E00",
+        skills=None,
+        impossibles=None,
+        resume=True,
+        graph_output=None,
+        *args,
+        **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.idx = idx
@@ -1037,10 +1090,41 @@ class EnvNode(Node):
             if not os.path.exists(graph_dir):
                 os.makedirs(graph_dir)
         self.graph_output = graph_output
+        self.skills = [] if skills is None else skills
+        self.impossibles = [] if impossibles is None else impossibles
+
+    @property
+    def num_skills(self):
+        return len(self.skills)
+
+    @property
+    def num_impossibles(self):
+        return len(self.impossibles)
 
     def init(self):
         super().init()
-        initial_system = self.initial_system + self.code_output_tip
+        if self.num_skills > 0:
+            _skill_list_str = "\n".join(
+                [f"({i+1}) {skill}" for i, skill in enumerate(self.skills)]
+            )
+            skill_list_str = f"We have already acquired {self.num_skills} skills:\n{_skill_list_str}\n"
+        else:
+            skill_list_str = ""
+        if self.num_impossibles > 0:
+            _im_list_str = "\n".join(
+                [f"({i+1}) {im}" for i, im in enumerate(self.impossibles)]
+            )
+            im_list_str = f"Previously we tried but failed to learn the following {self.num_impossibles} skills:\n{_im_list_str}\nMaybe consider to propose easier or clearer tasks.\n"
+        else:
+            im_list_str = ""
+        initial_system = (
+            self.initial_system.format(
+                skills_count=self.num_skills,
+                skills=skill_list_str,
+                impossibles=im_list_str,
+            )
+            + self.code_output_tip
+        )
         initial_user = self.initial_user.format(
             env_obs_code_string=self.env_obs_code,
         )
@@ -1053,6 +1137,8 @@ class EnvNode(Node):
     def propose_fake(
         self, n_samples=1, temperature=0, model="gpt-3.5-turbo"
     ) -> List[TaskNode]:
+        self.init()
+        messages = self.messages
         pattern = r"([Tt]ask\s+\d+:.*)"
         content = """
 Task 1: Move Cube A to a specific target position on the table.
@@ -1083,6 +1169,7 @@ Task 10: Pick up Cube B and place it on top of Cube A.
     def propose(
         self, n_samples=1, temperature=0, model="gpt-3.5-turbo"
     ) -> List[TaskNode]:
+        self.init()
         messages = self.messages
         responses = gpt_call(
             messages=messages,
@@ -1095,6 +1182,7 @@ Task 10: Pick up Cube B and place it on top of Cube A.
         pattern = r"([Tt]ask\s+\d+:.*)"
         content = responses[0]["message"]["content"]
         tasks = re.findall(pattern, content)
+        assert len(self.children) == 0
         for task in tasks:
             code = task.split(": ")[-1]
             child: TaskNode = TaskNode(
@@ -1155,6 +1243,27 @@ Task 10: Pick up Cube B and place it on top of Cube A.
         logging.info(f"Loaded graph {graph_input}.")
         return self
 
+    def collect(self):
+        for task_child in self.children:
+            self._collect_skill(task_child)
+        return
+
+    def _update_self_with_node(self, node):
+        super()._update_self_with_node(node)
+        # self.skills = node["skills"] if 'skills' in node.keys() else []
+        return
+
+    def _collect_skill(self, child):
+        if child.num_variants > 0:
+            self.skills.append(child.code)
+            logging.info(
+                f"Collected new skill {child.code} with {child.num_variants} variants."
+            )
+        else:
+            self.impossibles.append(child.code)
+            logging.info(f"Mission impossible on {child.code}.")
+        return
+
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")
 def main(cfg):
@@ -1176,11 +1285,20 @@ def main(cfg):
             model=model,
             n_samples=1,
             temperature=cfg.temperature,
+            skills=[
+                "Move cube A to target position",
+            ],
+            impossibles=[
+                "Pick up the plate",
+            ],
         )
         .init()
         .load_graph()
     )
 
+    bc = BehaviorCaptioner(
+        init_sys_prompt=f"{env_node.prompt_dir}/task/behavior_context.txt"
+    )
     # Eureka-plus generation loop
     for i in range(cfg.iteration):
         logging.info(f"Iteration {i}: Generating with {model}")
@@ -1209,9 +1327,9 @@ def main(cfg):
                     node.run()
             for success_node in success_nodes:
                 success_node.collect()
+        task_node.collect(behavior_captioner=bc)  # check behavior caption
         env_node.save_graph()
-        env_node.load_graph()
-        task_node.collect()  # check behavior caption
+    env_node.collect()
 
 
 if __name__ == "__main__":

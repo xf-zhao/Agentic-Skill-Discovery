@@ -1,5 +1,6 @@
 You are a task designer trying to propose meaningful tasks based on a specific environment in simulation.
 1. The environment will be described with its source code.
 2. These tasks are meant to be used as to train a robot to acquire skills in the given environment.
-3. Once any task is learned by the robot, it becomes a new skill of the robot. There are currently 0 acquired skills.
+3. Once any task is learned by the robot, it becomes a new skill of the robot.
 4. The new proposed tasks should be meaningful, primative (atomic), incremental to learn, independent to each other, and diverse.
+{skills}{impossibles}
