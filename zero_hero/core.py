@@ -21,7 +21,7 @@ from .behavior import BehaviorCaptioner, video_to_frames
 
 DUMMY_FAILURE = -10000.0
 ORBIT_ROOT_DIR = os.environ["ORBIT_ROOT_DIR"]
-print(ORBIT_ROOT_DIR)
+ZERO_HERO_ROOT_DIR = ORBIT_ROOT_DIR + "zero_hero"
 ISAAC_ROOT_DIR = f"{ORBIT_ROOT_DIR}/_isaac_sim"
 
 MODULE_INIT = """
@@ -182,7 +182,7 @@ def extract_code_string(response, combine_all=False):
 class Node:
     def __init__(
         self,
-        root_dir,
+        root_dir=None,
         idx=None,
         type=None,
         messages=None,
@@ -195,7 +195,7 @@ class Node:
         temperature=0,
         ite=0,
     ) -> None:
-        self.root_dir = root_dir
+        self.root_dir = root_dir if root_dir is not None else ZERO_HERO_ROOT_DIR
         self.prompt_dir = f"{self.root_dir}/eurekaplus/utils/prompts"
         self.env_name = env_name
         self.type = type
@@ -762,6 +762,7 @@ class SuccessNode(Node):
             if not no_err:
                 continue
             child = RewardNode(
+                root_dir=self.root_dir,
                 num_envs=num_envs,
                 max_iterations=max_iterations,
                 task=self.task,
@@ -953,6 +954,7 @@ class TaskNode(Node):
             if not no_err:
                 continue
             child: SuccessNode = SuccessNode(
+                root_dir=self.root_dir,
                 task=self,
                 messages=messages,
                 response=response,
@@ -1100,7 +1102,11 @@ class EnvNode(Node):
         for task in tasks:
             code = task.split(": ")[-1].replace("specific", "target")
             child: TaskNode = TaskNode(
-                code=code, n_samples=n_samples, temperature=temperature, model=model
+                root_dir=self.root_dir,
+                code=code,
+                n_samples=n_samples,
+                temperature=temperature,
+                model=model,
             )
             self.add_child(child)
             child.init()
