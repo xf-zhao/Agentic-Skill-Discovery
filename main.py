@@ -411,7 +411,7 @@ class Node:
 
     def _loop_until_no_syntax_err(self, messages, response=None, replacements={}):
         init_messages = messages.copy()
-        for __ in range(10):
+        for t in range(10):
             messages = init_messages.copy()
             gpt_err = False
             for _ in range(5):
@@ -420,7 +420,7 @@ class Node:
                         messages=messages,
                         model=self.model,
                         n_samples=1,
-                        temperature=self.temperature,
+                        temperature=self.temperature + t * 0.1,
                     )
                     if responses is None:
                         gpt_err = True
@@ -684,14 +684,22 @@ class RewardNode(Node):
         return
 
     def _block_until_play_recorded(self):
-        image_paths = None
+        pattern = r".*(Loading model checkpoint from.*)"
         for _ in range(60 * 5):  # 5 mins throw error
-            time.sleep(1)
-            play_video = self.log_dir + "/rl-video-step-0.mp4"
-            if os.path.exists(play_video):
+            play_log = file_to_string(self.play_filepath)
+            model_path_reg = re.search(pattern=pattern, string=play_log)
+            if model_path_reg is None:
+                time.sleep(1)
+            else:
+                video_path = (
+                    model_path_reg.group(1).split(":")[1].strip().replace(".pt", "_videos")
+                )
+                play_video = f"{video_path}/rl-video-step-0.mp4"
+                assert os.path.exists(play_video)
                 image_paths = video_to_frames(play_video)
-                break
-        return image_paths
+                logging.info(f"Processed video {play_video} into frames for GPT-4v.")
+                return image_paths
+        return
 
     def _summarize_runlog(self):
         self.rl_run.communicate()
@@ -906,7 +914,7 @@ class SuccessNode(Node):
         logging.info(
             f"Iteration {self.ite}: Max Success: {max_success}, Execute Rate: {execute_rate}"
         )
-        logging.info(f"Iteration {self.ite}: Best Generation ID: {best_sample_idx}")
+        logging.info(f"Iteration {self.ite}: Best Generation ID: {best_reward.idx}")
         logging.info(
             f"Iteration {self.ite}: GPT Output Content:\n"
             + best_reward.response["message"]["content"]
@@ -1044,11 +1052,14 @@ class TaskNode(Node):
         children_bak = self.children.copy()
         self.children = []
         for success_child in children_bak:
-            behavior_image_paths = success_child.best_reward.play()
-            succ = behavior_captioner.conclude(behavior_image_paths, task=self.code)
-            if succ:
-                self._collect_variant(success_child)
-                self.add_child(success_child)
+            if success_child.best_reward is not None:
+                behavior_image_paths = success_child.best_reward.play()
+                succ = behavior_captioner.conclude(behavior_image_paths, task=self.code)
+                if succ:
+                    self._collect_variant(success_child)
+                    self.add_child(success_child)
+                else:
+                    success_child.unlink()
             else:
                 success_child.unlink()
         return
