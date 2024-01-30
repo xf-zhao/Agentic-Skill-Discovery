@@ -15,3 +15,4 @@ matplotlib
 openai==0.28.0
 gpustat
 torch<=2.0.0
+wandb

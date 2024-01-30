@@ -361,7 +361,7 @@ class Node:
                 code = prefix_codes + code
                 temp.write(code.encode("utf-8"))
                 logging.info(f"Examining syntax with temp file: {temp.name}...")
-            subprocess.check_output(['python3', temp.name], stderr=subprocess.STDOUT)
+            subprocess.check_output(["python3", temp.name], stderr=subprocess.STDOUT)
             if remove_temp:
                 os.remove(temp.name)
             no_err = True
@@ -1100,7 +1100,12 @@ class EnvNode(Node):
                 break
         assert tasks is not None
         for task in tasks:
-            code = task.split(": ")[-1].replace("specific", "target")
+            code = (
+                task.split(": ")[-1]
+                .replace("specific", "target")
+                .replace("specified", "target")
+                .replace("target target", "target")
+            )
             child: TaskNode = TaskNode(
                 root_dir=self.root_dir,
                 code=code,
