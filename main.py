@@ -590,7 +590,7 @@ class RewardNode(Node):
                 if i % 60 == 0:
                     logging.info(f"")
                     logging.info(
-                        f"Available mem: {available_mem}. (Require {self.memory_requirement}). Waiting for enough mem to run node {self.parent.parent.idx}-{self.parent.idx}-{self.idx}. Time elapsed: {i//6} minutes."
+                        f"Available mem: {available_mem}. (Require {self.memory_requirement}). Waiting for enough mem to run node {self.idx}. Time elapsed: {i//6} minutes."
                     )
                 time.sleep(10)
         assert i < max_waiting - 1
@@ -1115,6 +1115,7 @@ class EnvNode(Node):
         impossibles=None,
         resume=True,
         graph_output=None,
+        status_output=None,
         *args,
         **kwargs,
     ) -> None:
@@ -1137,7 +1138,13 @@ class EnvNode(Node):
             graph_output = f"{graph_dir}/{self.env_name}_{self.idx}.json"
             if not os.path.exists(graph_dir):
                 os.makedirs(graph_dir)
+        if status_output is None:
+            status_dir = f"{self.root_dir}/envs_gpt/status"
+            status_output = f"{status_dir}/{self.env_name}_{self.idx}.json"
+            if not os.path.exists(status_dir):
+                os.makedirs(status_dir)
         self.graph_output = graph_output
+        self.status_output = status_output
         self.skills = [] if skills is None else skills
         self.impossibles = [] if impossibles is None else impossibles
 
@@ -1207,6 +1214,81 @@ class EnvNode(Node):
             # One task each time
             break
         return self.children
+
+    def save_status(self):
+        def get_variant_tree(variant):
+            tree = {
+                "best_reward": {
+                    variant.best_reward.idx: {
+                        "priors": variant.best_reward.priors,
+                        "summary": variant.best_reward.summary,
+                    }
+                },
+                "stats": variant.stats,
+            }
+            return tree
+
+        def get_variant_forest(variants):
+            forest = {variant.idx: get_variant_tree(variant) for variant in variants}
+            return forest
+
+        def get_skill_tree(skill):
+            tree = {
+                "variants": get_variant_forest(skill.variants),
+                "candidates": get_variant_forest(skill.candidates),
+            }
+            return tree
+
+        def get_skill_forest(skills):
+            forest = {skill.idx: get_skill_tree(skill) for skill in skills}
+            return forest
+
+        status = {
+            "Env": self.env_name,
+            "idx": self.idx,
+            "skills": get_skill_forest(self.skills),
+            "impossibles": get_skill_forest(self.impossibles),
+        }
+        with open(self.status_output, "w") as fout:
+            data_json = json.dumps(status)
+            fout.write(data_json + "\n")
+            logging.info(f"Saved status {self.idx} to {self.status_output}")
+        return
+
+    def load_status(self, status_input=None):
+        if status_input is None:
+            status_input = self.status_output
+        if not os.path.exists(status_input):
+            logging.info(f"No status found in {status_input}, creating a new one.")
+            return self
+        with open(status_input, "r") as fin:
+            status = json.load(fin)
+        self.idx = status["idx"]
+        self.env_name = status["Env"]
+
+        def build_status(key="skills"):
+            skills = []
+            for skill_idx, skill_tree in status[key].items():
+                skill = TaskNode(idx=skill_idx)
+                variants = []
+                for variant_idx, variant_tree in skill_tree["variants"].items():
+                    variant = SuccessNode(idx=variant_idx, stats=variant_tree["stats"])
+                    for reward_idx, reward_values in variant_tree[
+                        "best_reward"
+                    ].items():
+                        best_reward_node = RewardNode(
+                            idx=reward_idx, priors=reward_values["priors"]
+                        )
+                        best_reward_node.summary = reward_values["summary"]
+                        break
+                    variant.best_reward = best_reward_node
+                variants.append(variant)
+                skill.variants = variants
+                skills.append(skill)
+            return skills
+
+        self.skills = build_status("skills")
+        self.impossibles = build_status("impossibles")
 
     def save_graph(self):
         G = self.G
@@ -1333,7 +1415,7 @@ def learn_next_skill(env_node, cfg, bc):
                 success_node.collect()
         task_node.collect(behavior_captioner=bc)  # check behavior caption
     env_node.collect()
-    env_node.save_graph()
+    env_node.save_status()
     return env_node
 
 
@@ -1361,7 +1443,7 @@ def main(cfg):
             impossibles=[],
         )
         .init()
-        .load_graph()
+        .load_status()
     )
     logging.info(f"Env: {env.env_name} / {env_node.idx}")
     bc = BehaviorCaptioner(
