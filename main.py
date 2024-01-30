@@ -11,6 +11,7 @@ from zero_hero.core import EnvNode
 
 ZEROHERO_ROOT_DIR = f"{os.getcwd()}"
 
+
 def learn_next_skill(env_node, cfg, bc):
     task_nodes = env_node.propose(
         n_samples=cfg.n_success_samples, temperature=cfg.temperature, model=cfg.model
