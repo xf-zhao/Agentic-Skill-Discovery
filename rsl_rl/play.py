@@ -44,14 +44,14 @@ parser.add_argument(
 parser.add_argument(
     "--video_interval",
     type=int,
-    default=2000,
+    default=500,
     help="Interval between video recordings (in steps).",
 )
 parser.add_argument(
     "--steps",
     type=int,
-    default=2000,
-    help="Interval between video recordings (in steps).",
+    default=500,
+    help="Total steps.",
 )
 
 # append RSL-RL cli arguments

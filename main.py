@@ -292,6 +292,7 @@ def extract_code_string(response, combine_all=False):
 class Node:
     def __init__(
         self,
+        idx=None,
         type=None,
         messages=None,
         response=None,
@@ -315,7 +316,7 @@ class Node:
         self.model = model
         self.n_samples = n_samples
         self.temperature = temperature
-        self.idx = None
+        self.idx = idx
         self.messages = messages
         self.response = response
         self.code = code
@@ -1084,6 +1085,7 @@ class TaskNode(Node):
                 succ = behavior_captioner.conclude(behavior_image_paths, task=self.code)
                 if succ:
                     self._collect_variant(success_child)
+                    # control whether to re-use good success functions
                     self.add_child(success_child)
                 else:
                     self._collect_candidate(success_child)
@@ -1158,13 +1160,13 @@ class EnvNode(Node):
 
     def get_skill_list(self):
         _skill_list_str = "\n".join(
-            [f"({i+1}) {skill}" for i, skill in enumerate(self.skills)]
+            [f"({i+1}) {skill.code}" for i, skill in enumerate(self.skills)]
         )
         return _skill_list_str
 
     def get_impossible_list(self):
         _im_list_str = "\n".join(
-            [f"({i+1}) {im}" for i, im in enumerate(self.impossibles)]
+            [f"({i+1}) {im.code}" for i, im in enumerate(self.impossibles)]
         )
         return _im_list_str
 
@@ -1205,7 +1207,7 @@ class EnvNode(Node):
                 break
         assert tasks is not None
         for task in tasks:
-            code = task.split(": ")[-1]
+            code = task.split(": ")[-1].replace("specific", "target")
             child: TaskNode = TaskNode(
                 code=code, n_samples=n_samples, temperature=temperature, model=model
             )
@@ -1234,6 +1236,7 @@ class EnvNode(Node):
 
         def get_skill_tree(skill):
             tree = {
+                "code": skill.code,
                 "variants": get_variant_forest(skill.variants),
                 "candidates": get_variant_forest(skill.candidates),
             }
@@ -1269,7 +1272,7 @@ class EnvNode(Node):
         def build_status(key="skills"):
             skills = []
             for skill_idx, skill_tree in status[key].items():
-                skill = TaskNode(idx=skill_idx)
+                skill = TaskNode(idx=skill_idx, code=skill_tree["code"])
                 variants = []
                 for variant_idx, variant_tree in skill_tree["variants"].items():
                     variant = SuccessNode(idx=variant_idx, stats=variant_tree["stats"])
@@ -1289,6 +1292,7 @@ class EnvNode(Node):
 
         self.skills = build_status("skills")
         self.impossibles = build_status("impossibles")
+        return self
 
     def save_graph(self):
         G = self.G
@@ -1372,12 +1376,12 @@ class EnvNode(Node):
 
     def _collect_skill(self, child):
         if child.num_variants > 0:
-            self.skills.append(child.code)
+            self.skills.append(child)
             logging.info(
                 f"Collected new skill {child.code} with {child.num_variants} variants."
             )
         elif child.num_variants == 0:
-            self.impossibles.append(child.code)
+            self.impossibles.append(child)
             logging.info(f"Mission impossible on {child.code}.")
         else:
             pass
