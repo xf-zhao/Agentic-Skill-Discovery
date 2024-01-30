@@ -1,0 +1,15 @@
+imageio
+imageio-ffmpeg
+networkx
+numpy
+psutil
+pyyaml
+omegaconf
+gym==0.23.1
+hydra-core>=1.1
+pyvirtualdisplay
+tensorboard>=1.14.0
+tensorboardX>=1.6
+numpy==1.20.0
+matplotlib
+openai==0.28.0

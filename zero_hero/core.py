@@ -1037,6 +1037,7 @@ class EnvNode(Node):
                 os.makedirs(status_dir)
         self.graph_output = graph_output
         self.status_output = status_output
+        self.status = None
         self.skills = [] if skills is None else skills
         self.impossibles = [] if impossibles is None else impossibles
 
@@ -1146,6 +1147,7 @@ class EnvNode(Node):
             data_json = json.dumps(status)
             fout.write(data_json + "\n")
             logging.info(f"Saved status {self.idx} to {self.status_output}")
+        self.status = status
         return
 
     def load_status(self, status_input=None):
