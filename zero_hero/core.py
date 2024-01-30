@@ -20,8 +20,8 @@ from .behavior import BehaviorCaptioner, video_to_frames
 
 
 DUMMY_FAILURE = -10000.0
-ZEROHERO_ROOT_DIR = f"{os.getcwd()}"
-ORBIT_ROOT_DIR = f"/data/xufeng/workspace/isaac/orbit"
+ORBIT_ROOT_DIR = os.environ["ORBIT_ROOT_DIR"]
+print(ORBIT_ROOT_DIR)
 ISAAC_ROOT_DIR = f"{ORBIT_ROOT_DIR}/_isaac_sim"
 
 MODULE_INIT = """
@@ -182,12 +182,12 @@ def extract_code_string(response, combine_all=False):
 class Node:
     def __init__(
         self,
+        root_dir,
         idx=None,
         type=None,
         messages=None,
         response=None,
         code=None,
-        root_dir=None,
         iterations=1,
         env_name="franka_table",
         model="gpt-3.5-turbo",
@@ -195,7 +195,7 @@ class Node:
         temperature=0,
         ite=0,
     ) -> None:
-        self.root_dir = root_dir if root_dir is not None else ZEROHERO_ROOT_DIR
+        self.root_dir = root_dir
         self.prompt_dir = f"{self.root_dir}/eurekaplus/utils/prompts"
         self.env_name = env_name
         self.type = type
