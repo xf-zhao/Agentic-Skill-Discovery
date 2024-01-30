@@ -1317,7 +1317,7 @@ def main(cfg):
             temperature=cfg.temperature,
             model=model,
         )  # params for child init
-        for i in range(1):
+        for i in range(2):
             for success_node in success_nodes:
                 reward_nodes = success_node.propose(
                     num_envs=num_envs,
