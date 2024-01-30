@@ -13,7 +13,7 @@ resume: True
 # model: gpt-4-turbo-preview
 model: gpt-3.5-turbo-1106  # LLM model (other options are gpt-4, gpt-4-0613, gpt-3.5-turbo-16k-0613)
 seed: 1
-temperature: 0.7
+temperature: 1
 debug: False
 max_iterations: 2000 # RL Policy training iterations (decrease this to make the feedback loop faster)
 headless: True
@@ -24,8 +24,8 @@ memory_requirement: 16
 # Eureka parameters
 target_num_skills: 20
 task_iterations: 3 # iterate to acquire more variants
-n_success_samples: 3 # number of samples to generate success function per iteration
-n_reward_samples: 3 # number of samples to generate reward function per iteration
+n_success_samples: 4 # number of samples to generate success function per iteration
+n_reward_samples: 4 # number of samples to generate reward function per iteration
 reward_iterations: 3
 num_variants: 1 # break if sufficient
 num_eval: 4 # number of evaluation episodes to run for the final reward
