@@ -1300,7 +1300,7 @@ def main(cfg):
     )
 
     bc = BehaviorCaptioner(
-        init_sys_prompt=f"{env_node.prompt_dir}/task/behavior_context.txt"
+        init_sys_prompt=f"{env_node.prompt_dir}/task/behavior_context.txt",
     )
     # Eureka-plus generation loop
     for i in range(cfg.iteration):

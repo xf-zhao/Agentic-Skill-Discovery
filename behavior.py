@@ -1,4 +1,5 @@
 import imageio.v3 as iio
+import logging, time
 import base64
 import openai
 import os
@@ -20,34 +21,48 @@ def video_to_frames(video_file):
 
 
 class BehaviorCaptioner:
-    def __init__(self, init_sys_prompt, model="gpt-4-vision-preview") -> None:
-        self.init_sys_prompt = file_to_string( init_sys_prompt)
+    def __init__(
+        self, init_sys_prompt, model="gpt-4-vision-preview", save=True
+    ) -> None:
+        self.init_sys_prompt = file_to_string(init_sys_prompt)
         self.model = model
+        self.save = save
 
     def describe(self, image_paths, task: str = ""):
         image_contents = [
             self.make_image_content(image_path) for image_path in image_paths
         ]
-        response = openai.ChatCompletion.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": [
-                        {"type": "text", "text": self.init_sys_prompt},
+        for attempt in range(10):
+            try:
+                response = openai.ChatCompletion.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": [
+                                {"type": "text", "text": self.init_sys_prompt},
+                            ],
+                        },
+                        {"role": "user", "content": [*image_contents, task]},
                     ],
-                },
-                {"role": "user", "content": [*image_contents, task]},
-            ],
-            max_tokens=4096,
-            n=1,
-        )
+                    max_tokens=4096,
+                    n=1,
+                )
+                break
+            except Exception as e:
+                err_msg = f"Attempt {attempt+1} failed with error: {e}"
+                logging.info(err_msg)
+                time.sleep(1)
         msg = response.choices[0]
         return msg
 
     def conclude(self, image_paths, task: str = ""):
         msg = self.describe(image_paths=image_paths, task=task)
         description = msg["message"]["content"]
+        if self.save:
+            log_dir = os.path.dirname(image_paths)
+            with open(f"{log_dir}/caption.txt", "w") as fcap:
+                fcap.write(description)
         succ = None
         if "FAIL" in description:
             succ = True
@@ -71,5 +86,3 @@ class BehaviorCaptioner:
     def _encode_image(self, image_path):
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
-
-
