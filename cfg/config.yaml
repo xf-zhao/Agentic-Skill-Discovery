@@ -16,17 +16,17 @@ seed: 1
 temperature: 0.7
 debug: False
 num_envs: 2048
-target_num_skills: 10
 max_iterations: 2000 # RL Policy training iterations (decrease this to make the feedback loop faster)
 headless: True
 video: False
 memory_requirement: 4
 
 # Eureka parameters
-n_reward_samples: 3 # number of samples to generate reward function per iteration
-n_success_samples: 2 # number of samples to generate success function per iteration
-reward_iterations: 3
+target_num_skills: 20
 task_iterations: 3 # iterate to acquire more variants
+n_success_samples: 3 # number of samples to generate success function per iteration
+n_reward_samples: 3 # number of samples to generate reward function per iteration
+reward_iterations: 3
 num_variants: 1 # break if sufficient
 num_eval: 4 # number of evaluation episodes to run for the final reward
 capture_video: False # whether to capture policy rollout videos

@@ -1175,7 +1175,7 @@ class EnvNode(Node):
                         best_reward_node.summary = reward_values["summary"]
                         break
                     variant.best_reward = best_reward_node
-                variants.append(variant)
+                    variants.append(variant)
                 skill.variants = variants
                 skills.append(skill)
             return skills
