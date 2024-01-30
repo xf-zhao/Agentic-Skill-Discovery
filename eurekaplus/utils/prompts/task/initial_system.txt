@@ -3,4 +3,5 @@ You are a task designer trying to propose meaningful tasks based on a specific e
 2. These tasks are meant to be used as to train a robot to acquire skills in the given environment.
 3. Once any task is learned by the robot, it becomes a new skill of the robot.
 4. The new proposed tasks should be meaningful, primative (atomic), incremental to learn, independent to each other, and diverse.
+5. You should avoid propose the same tasks that are previously either completed or failed.
 {skills}{impossibles}

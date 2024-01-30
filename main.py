@@ -610,7 +610,7 @@ class RewardNode(Node):
             "--max_iterations",
             f"{self.max_iterations}",
             "--log_dir",
-            self.log_dir,
+            os.path.dirname(self.log_dir),
         ]
         if self.headless:
             rl_run_command.append("--headless")
@@ -618,6 +618,7 @@ class RewardNode(Node):
             rl_run_command.append("--video")
             if self.headless:
                 rl_run_command.append("--offscreen_render")
+        print(f"Executing commands: {rl_run_command}")
         with open(self.rl_filepath, "w") as f:
             self.rl_run = subprocess.Popen(
                 rl_run_command,
@@ -647,6 +648,7 @@ class RewardNode(Node):
             rl_run_command.append("--headless")
             rl_run_command.append("--offscreen_render")
         self.play_filepath = self.rl_filepath.rstrip(".txt") + "_play.txt"
+        print(f"Executing commands: {rl_run_command}")
         with open(self.play_filepath, "w") as f:
             self.rl_run = subprocess.Popen(
                 rl_run_command,
@@ -1134,55 +1136,15 @@ class EnvNode(Node):
         ]
         return self
 
-    def propose_fake(
-        self, n_samples=1, temperature=0, model="gpt-3.5-turbo"
-    ) -> List[TaskNode]:
-        self.init()
-        messages = self.messages
-        pattern = r"([Tt]ask\s+\d+:.*)"
-        content = """
-Task 1: Move Cube A to a specific target position on the table.
-Task 2: Move Cube B to a specific target position on the table.
-Task 3: Move the plate to a specific target position on the table.
-Task 4: Open the drawer.
-Task 5: Close the drawer.
-Task 6: Pick up Cube A and place it inside the drawer.
-Task 7: Pick up Cube B and place it inside the drawer.
-Task 8: Pick up the plate and place it inside the drawer.
-Task 9: Pick up Cube A and place it on top of Cube B.
-Task 10: Pick up Cube B and place it on top of Cube A.
-"""
-        tasks = re.findall(pattern, content)
-
-        for task in tasks:
-            code = task.split(": ")[-1]
-            child: TaskNode = TaskNode(
-                code=code,
-                n_samples=n_samples,
-                temperature=temperature,
-                model=model,
-            )
-            self.add_child(child)
-            child.init()
-        return self.children
-
     def propose(
         self, n_samples=1, temperature=0, model="gpt-3.5-turbo"
     ) -> List[TaskNode]:
-        self.init()
-        messages = self.messages
-        responses = gpt_call(
-            messages=messages,
-            model=self.model,
-            n_samples=1,
-            temperature=self.temperature,
-        )
-        if self.n_samples == 1:
-            logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
-        pattern = r"([Tt]ask\s+\d+:.*)"
-        content = responses[0]["message"]["content"]
-        tasks = re.findall(pattern, content)
-        assert len(self.children) == 0
+        tasks = None
+        for i in range(5):
+            tasks = self._propose(temperature_increase=i * 0.1)
+            if len(tasks) > 0:
+                break
+        assert tasks is not None
         for task in tasks:
             code = task.split(": ")[-1]
             child: TaskNode = TaskNode(
@@ -1248,6 +1210,22 @@ Task 10: Pick up Cube B and place it on top of Cube A.
             self._collect_skill(task_child)
         return
 
+    def _propose(self, temperature_increase=0) -> List[TaskNode]:
+        self.init()
+        messages = self.messages
+        responses = gpt_call(
+            messages=messages,
+            model=self.model,
+            n_samples=1,
+            temperature=self.temperature + temperature_increase,
+        )
+        if self.n_samples == 1:
+            logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
+        pattern = r"([Tt]ask\s+\d+:.*)"
+        content = responses[0]["message"]["content"]
+        tasks = re.findall(pattern, content)
+        return tasks
+
     def _update_self_with_node(self, node):
         super()._update_self_with_node(node)
         if "skills" in node.keys():
@@ -1294,9 +1272,8 @@ def main(cfg):
             impossibles=[
                 "Pick up the plate",
             ],
-        )
-        .init()
-        .load_graph()
+        ).init()
+        # .load_graph()
     )
 
     bc = BehaviorCaptioner(
@@ -1305,10 +1282,10 @@ def main(cfg):
     # Eureka-plus generation loop
     for i in range(cfg.iteration):
         logging.info(f"Iteration {i}: Generating with {model}")
-        task_nodes = env_node.propose_fake(
+        # task_nodes = env_node.propose_fake( n_samples=cfg.n_success_samples, temperature=cfg.temperature, model=model)
+        task_nodes = env_node.propose(
             n_samples=cfg.n_success_samples, temperature=cfg.temperature, model=model
         )
-        # task_nodes = env_node.propose()
         for task_node in task_nodes:
             break
         success_nodes = task_node.propose(
@@ -1333,6 +1310,7 @@ def main(cfg):
         task_node.collect(behavior_captioner=bc)  # check behavior caption
     env_node.collect()
     env_node.save_graph()
+    logging("All done!")
 
 
 if __name__ == "__main__":

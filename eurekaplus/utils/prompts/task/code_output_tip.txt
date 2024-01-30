@@ -3,3 +3,5 @@ Some helpful tips for writing the tasks:
     (2) The success of the tasks should be measurable with current observations, e.g. object positions. The environment doesn't support collision detection yet. For simplicity, ignore collision.
     (3) Use less objects in one atomic task.
     (4) Make sure to not mention any joint positions as the task goal.
+    (5) Let's work this out in a step by step way to be sure we have the right answer.
+    (5) Finally, collect all of the proposals and sort them with their difficulties, easy ones first. Make a task list, every line contains one specific task starting with `Task {num}: `, where `num` is the task order.
