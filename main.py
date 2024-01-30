@@ -1250,7 +1250,10 @@ Task 10: Pick up Cube B and place it on top of Cube A.
 
     def _update_self_with_node(self, node):
         super()._update_self_with_node(node)
-        # self.skills = node["skills"] if 'skills' in node.keys() else []
+        if "skills" in node.keys():
+            self.skills = node["skills"]
+        if "impossibles" in node.keys():
+            self.impossibles = node["impossibles"]
         return
 
     def _collect_skill(self, child):
@@ -1328,8 +1331,8 @@ def main(cfg):
             for success_node in success_nodes:
                 success_node.collect()
         task_node.collect(behavior_captioner=bc)  # check behavior caption
-        env_node.save_graph()
     env_node.collect()
+    env_node.save_graph()
 
 
 if __name__ == "__main__":
