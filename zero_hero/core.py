@@ -351,6 +351,8 @@ class Node:
         prefix_codes="import torch\n\n",
         remove_temp=False,
     ):
+        python_exe = os.environ["PYTHON_EXE"]
+        python = "python" if len(python_exe) == 0 else python_exe
         if code is None:
             return False, self.code_format_feedback
         err_feedback = None
@@ -361,7 +363,7 @@ class Node:
                 code = prefix_codes + code
                 temp.write(code.encode("utf-8"))
                 logging.info(f"Examining syntax with temp file: {temp.name}...")
-            subprocess.check_output(["python", temp.name], stderr=subprocess.STDOUT)
+            subprocess.check_output([python, temp.name], stderr=subprocess.STDOUT)
             if remove_temp:
                 os.remove(temp.name)
             no_err = True
