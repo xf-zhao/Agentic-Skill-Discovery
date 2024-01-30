@@ -378,6 +378,10 @@ class Node:
         elif node_type == "Task":
             if node.num_variants > 0:
                 data.update({"variants": [variant.idx for variant in node.variants]})
+            if node.num_candidates > 0:
+                data.update(
+                    {"candidates": [candidate.idx for candidate in node.candidates]}
+                )
         else:
             pass
         self.G.add_node(node.idx, **data)
@@ -843,7 +847,15 @@ class SuccessNode(Node):
             n_samples=self.n_samples,
             temperature=self.temperature,
         )
-        if self.n_samples == 1:
+        if responses is None:
+            responses = gpt_call(
+                messages=self.messages,
+                model=self.model,
+                n_samples=1,
+                temperature=self.temperature + 0.5,
+            )
+
+        if len(responses) == 1:
             logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
 
         for response in responses:
@@ -911,7 +923,7 @@ class SuccessNode(Node):
 
         # some statistic report
         max_success = best_reward.summary["success"]
-        execute_rate = np.sum(np.array(successes) >= 0.0) / self.n_samples
+        execute_rate = np.array(successes).mean()
 
         self.ite += 1
         logging.info(
@@ -974,7 +986,7 @@ class SuccessNode(Node):
 
 
 class TaskNode(Node):
-    def __init__(self, variants=None, *args, **kwargs) -> None:
+    def __init__(self, variants=None, candidates=None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Task"
         self.initial_system = file_to_string(
@@ -994,10 +1006,15 @@ class TaskNode(Node):
             f"{self.prompt_dir}/success/code_feedback.txt"
         )
         self.variants = [] if variants is None else variants
+        self.candidates = [] if candidates is None else candidates
 
     @property
     def num_variants(self):
         return len(self.variants)
+
+    @property
+    def num_candidates(self):
+        return len(self.candidates)
 
     def init(self):
         super().init()
@@ -1025,7 +1042,14 @@ class TaskNode(Node):
             n_samples=self.n_samples,
             temperature=self.temperature,
         )
-        if self.n_samples == 1:
+        if responses is None:
+            responses = gpt_call(
+                messages=self.messages,
+                model=self.model,
+                n_samples=1,
+                temperature=self.temperature + 0.5,
+            )
+        if len(responses) == 1:
             logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
 
         for response in responses:
@@ -1062,6 +1086,7 @@ class TaskNode(Node):
                     self._collect_variant(success_child)
                     self.add_child(success_child)
                 else:
+                    self._collect_candidate(success_child)
                     success_child.unlink()
             else:
                 success_child.unlink()
@@ -1071,6 +1096,13 @@ class TaskNode(Node):
         self.variants.append(child)
         logging.info(
             f"GPT-4v verified and collected task {self.idx} with variant success {child.idx}, best reward {child.best_reward.idx}. Current variant count: {self.num_variants}"
+        )
+        return
+
+    def _collect_candidate(self, child):
+        self.candidates.append(child)
+        logging.info(
+            f"GPT-4v verified but does not admit task {self.idx} with variant success {child.idx}, best reward {child.best_reward.idx}. Current candidates count: {self.num_candidates}"
         )
         return
 
@@ -1119,14 +1151,14 @@ class EnvNode(Node):
 
     def get_skill_list(self):
         _skill_list_str = "\n".join(
-                [f"({i+1}) {skill}" for i, skill in enumerate(self.skills)]
-            )
+            [f"({i+1}) {skill}" for i, skill in enumerate(self.skills)]
+        )
         return _skill_list_str
 
     def get_impossible_list(self):
         _im_list_str = "\n".join(
-                [f"({i+1}) {im}" for i, im in enumerate(self.impossibles)]
-            )
+            [f"({i+1}) {im}" for i, im in enumerate(self.impossibles)]
+        )
         return _im_list_str
 
     def init(self):
@@ -1275,7 +1307,7 @@ def learn_next_skill(env_node, cfg, bc):
         n_samples=cfg.n_success_samples, temperature=cfg.temperature, model=cfg.model
     )
     for task_node in task_nodes:
-        logging.info(f'Learn-Next-Skill: {task_node.code}.')
+        logging.info(f"Learn-Next-Skill: {task_node.code}.")
         break
     for _ in range(cfg.task_iterations):
         if task_node.num_variants >= cfg.num_variants:
@@ -1303,6 +1335,7 @@ def learn_next_skill(env_node, cfg, bc):
     env_node.collect()
     env_node.save_graph()
     return env_node
+
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")
 def main(cfg):
@@ -1334,16 +1367,21 @@ def main(cfg):
     bc = BehaviorCaptioner(
         init_sys_prompt=f"{env_node.prompt_dir}/task/behavior_context.txt",
     )
-    for i_task in range(cfg.target_num_skills*10):
-        print('-'*100)
-        logging.info(f'{env_node.idx}/{i_task}: Acquired {env_node.num_skills} skills, gave up on {env_node.num_impossibles} impossibles.')
+    for i_task in range(cfg.target_num_skills * 10):
+        print("-" * 100)
+        logging.info(
+            f"{env_node.idx}/{i_task}: Acquired {env_node.num_skills} skills, gave up on {env_node.num_impossibles} impossibles."
+        )
         if env_node.num_skills >= cfg.target_num_skills:
-            logging.info(f'Finished accumulating {env_node.num_skills} skills.')
+            logging.info(f"Finished accumulating {env_node.num_skills} skills.")
             break
         learn_next_skill(env_node, cfg, bc)
-    logging.info(f'Acquired {env_node.num_skills} skills: {env_node.get_skill_list()}')
-    logging.info(f'Gave up on {env_node.num_impossibles} impossibiles: {env_node.get_impossible_list()}')
+    logging.info(f"Acquired {env_node.num_skills} skills: {env_node.get_skill_list()}")
+    logging.info(
+        f"Gave up on {env_node.num_impossibles} impossibiles: {env_node.get_impossible_list()}"
+    )
     logging.info("All done!")
+
 
 if __name__ == "__main__":
     main()
