@@ -16,7 +16,7 @@ from omni.isaac.orbit_tasks.utils.wrappers.rsl_rl import (
 class PlayCubePPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 2000
-    save_interval = 10
+    save_interval = 100
     experiment_name = "franka_table"
     empirical_normalization = False
     policy = RslRlPpoActorCriticCfg(
