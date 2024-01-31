@@ -24,6 +24,9 @@ parser.add_argument(
     "--cpu", action="store_true", default=False, help="Use CPU pipeline."
 )
 parser.add_argument(
+    "--onnx", action="store_true", default=False, help="Export onnx model."
+)
+parser.add_argument(
     "--num_envs", type=int, default=None, help="Number of environments to simulate."
 )
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
@@ -45,13 +48,13 @@ parser.add_argument(
 parser.add_argument(
     "--video_interval",
     type=int,
-    default=200,
+    default=400,
     help="Interval between video recordings (in steps).",
 )
 parser.add_argument(
     "--steps",
     type=int,
-    default=400,
+    default=300,
     help="Total steps.",
 )
 
@@ -153,10 +156,12 @@ def main():
     policy = ppo_runner.get_inference_policy(device=env.unwrapped.device)
 
     # export policy to onnx
-    export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
-    export_policy_as_onnx(
-        ppo_runner.alg.actor_critic, export_model_dir, filename="policy.onnx"
-    )
+    if args_cli.onnx:
+        export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
+        export_policy_as_onnx(
+            ppo_runner.alg.actor_critic, export_model_dir, filename="policy.onnx"
+        )
+        print(f'[INFO]: Exported policy.onnx')
 
     steps = 0
     # reset environment
