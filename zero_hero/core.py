@@ -1009,27 +1009,35 @@ class TaskNode(Node):
         children_bak = self.children.copy()
         self.children = []
         num_optimized = []
-        num_succ = []
+        num_v_succ = []
+        num_f_succ = []
         variant_videos = []
         candidate_videos = []
         for success_child in children_bak:
             if success_child.best_reward is not None:
                 num_optimized.append(1)
                 behavior_image_paths, video_path = success_child.best_reward.play()
-                succ = behavior_captioner.conclude(behavior_image_paths, task=self.code)
-                if succ:
-                    num_succ.append(1)
+                v_succ = behavior_captioner.conclude(
+                    behavior_image_paths, task=self.code
+                )
+                f_succ = int(success_child.best_reward.summary["success"] > 0)
+                num_f_succ.append(f_succ)
+                if v_succ:
+                    num_v_succ.append(1)
+                else:
+                    num_v_succ.append(0)
+                if v_succ and f_succ:
                     self._collect_variant(success_child)
                     variant_videos.append(video_path)
                     # control whether to re-use good success functions
                     self.add_child(success_child)
                 else:
-                    num_succ.append(0)
                     self._collect_candidate(success_child)
                     candidate_videos.append(video_path)
                     success_child.unlink()
             else:
-                num_succ.append(0)
+                num_f_succ.append(0)
+                num_v_succ.append(0)
                 num_optimized.append(0)
                 success_child.unlink()
 
@@ -1044,7 +1052,11 @@ class TaskNode(Node):
             return video_stats
 
         stat = {
-            "GPT-4v succ": np.array(num_succ).mean(),
+            "GPT-4v succ": np.array(num_v_succ).mean(),
+            "Func succ": np.array(num_f_succ).mean(),
+            "Succ consistant": np.array(
+                [a == b for a, b in zip(num_f_succ, num_v_succ)]
+            ).mean(),
             "num_optimized": np.array(num_optimized).mean(),
             **wrap_variant_video(variant_videos),
             **wrap_variant_video(candidate_videos),

@@ -10,9 +10,9 @@ hydra:
 
 resume: True
 # LLM parameters
-# model: gpt-4-turbo-preview
-model: gpt-3.5-turbo-1106  # LLM model (other options are gpt-4, gpt-4-0613, gpt-3.5-turbo-16k-0613)
-seed: 1
+model: gpt-4-turbo-preview
+# model: gpt-3.5-turbo-1106  # LLM model (other options are gpt-4, gpt-4-0613, gpt-3.5-turbo-16k-0613)
+seed: 0
 temperature: 1
 debug: False
 headless: True
@@ -22,11 +22,11 @@ num_envs: 11
 memory_requirement: 4
 
 # Eureka parameters
-target_num_skills: 40
-task_iterations: 2 # iterate to acquire more variants
+target_num_skills: 2
+task_iterations: 1 # iterate to acquire more variants
 n_success_samples: 2 # number of samples to generate success function per iteration
-n_reward_samples: 2 # number of samples to generate reward function per iteration
-reward_iterations: 2
+n_reward_samples: 3 # number of samples to generate reward function per iteration
+reward_iterations: 1
 num_variants: 1 # break if sufficient
 num_eval: 4 # number of evaluation episodes to run for the final reward
 capture_video: False # whether to capture policy rollout videos

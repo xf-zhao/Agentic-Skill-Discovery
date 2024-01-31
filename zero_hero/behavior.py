@@ -96,7 +96,3 @@ class BehaviorCaptioner:
     def _encode_image(self, image_path):
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
-
-
-x = video_to_frames(video_file='/data/xufeng/workspace/zero_hero/envs_gpt/franka_table/Rafbbee58/logs/model_1999_videos/rl-video-step-0.mp4')
-pass
