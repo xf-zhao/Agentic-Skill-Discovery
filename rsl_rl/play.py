@@ -60,8 +60,14 @@ cli_args.add_rsl_rl_args(parser)
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
+# load cheaper kit config in headless
+if args_cli.headless:
+    app_experience = f"{os.environ['EXP_PATH']}/omni.isaac.sim.python.gym.headless.kit"
+else:
+    app_experience = f"{os.environ['EXP_PATH']}/omni.isaac.sim.python.kit"
+
 # launch omniverse app
-app_launcher = AppLauncher(args_cli)
+app_launcher = AppLauncher(args_cli, experience=app_experience)
 simulation_app = app_launcher.app
 
 """Rest everything follows."""
