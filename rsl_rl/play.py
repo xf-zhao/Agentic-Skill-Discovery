@@ -45,7 +45,7 @@ parser.add_argument(
 parser.add_argument(
     "--video_interval",
     type=int,
-    default=500,
+    default=200,
     help="Interval between video recordings (in steps).",
 )
 parser.add_argument(
