@@ -16,20 +16,16 @@ seed: 0
 temperature: 1
 debug: False
 headless: True
+max_iterations: 2000 # RL Policy training iterations (decrease this to make the feedback loop faster)
+num_envs: 4096
+memory_requirement: 10
 video: False
-max_iterations: 10 # RL Policy training iterations (decrease this to make the feedback loop faster)
-num_envs: 11
-memory_requirement: 4
-
-# Eureka parameters
-target_num_skills: 2
-task_iterations: 1 # iterate to acquire more variants
-n_success_samples: 2 # number of samples to generate success function per iteration
+target_num_skills: 40
+task_iterations: 2 # iterate to acquire more variants
+n_success_samples: 3 # number of samples to generate success function per iteration
 n_reward_samples: 3 # number of samples to generate reward function per iteration
-reward_iterations: 1
-num_variants: 1 # break if sufficient
-num_eval: 4 # number of evaluation episodes to run for the final reward
-capture_video: False # whether to capture policy rollout videos
+reward_iterations: 3
+num_variants: 2 # break if sufficient
 
 # Weights and Biases
 wandb_project: "Zero-Hero" # wandb project if logging with wandb
