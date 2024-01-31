@@ -1,4 +1,5 @@
 import numpy as np
+import wandb
 import json
 import networkx as nx
 import psutil
@@ -87,10 +88,10 @@ REWARD_REPLACE_INPUT = """
 class RewardsCfg:
 """
 
-SUCCESS_MUST_CONTAIN = '''
+SUCCESS_MUST_CONTAIN = """
 @configclass
 class SuccessCfg:
-'''
+"""
 
 REWARD_REPLACE_OUTPUT = """
 @configclass
@@ -360,14 +361,17 @@ class Node:
     ):
         if code is None:
             return False, self.code_format_feedback
-        if self.type == 'Success':
+        if self.type == "Success":
             must_contain = REWARD_REPLACE_INPUT
-        elif self.type =='Task':
+        elif self.type == "Task":
             must_contain = SUCCESS_MUST_CONTAIN
         else:
-            must_contain = ''
-        if must_contain.strip('\n').strip() not in code:
-            return False, f'Please always configure with exact `{must_contain}`! No other new names.'
+            must_contain = ""
+        if must_contain.strip("\n").strip() not in code:
+            return (
+                False,
+                f"Please always configure with exact `{must_contain}`! No other new names.",
+            )
         err_feedback = None
         for k, v in replacements.items():
             code = code.replace(k, v)
@@ -442,6 +446,7 @@ class RewardNode(Node):
         self.cur_env_dir = None
         self.max_iterations = max_iterations
         self.priors = [] if priors is None else priors
+        self.video_path = None
 
     def init(self):
         super().init()
@@ -566,8 +571,10 @@ class RewardNode(Node):
                 stdout=f,
                 stderr=f,
             )
-        behavior_image_paths = self._block_until_play_recorded()
-        return behavior_image_paths
+        behavior_image_paths, video_path = self._block_until_play_recorded()
+        if video_path is not None:
+            self.video_path = video_path
+        return behavior_image_paths, video_path
 
     def summarize(self):
         summary = self._summarize_runlog()
@@ -600,15 +607,15 @@ class RewardNode(Node):
         play_log = file_to_string(self.play_filepath)
         model_path_reg = re.search(pattern=pattern, string=play_log)
         if model_path_reg is None:
-            return
+            return None, None
         video_dir = (
             model_path_reg.group(1).split(":")[1].strip().replace(".pt", "_videos")
         )
         video_path = f"{video_dir}/rl-video-step-0.mp4"
         if not os.path.exists(video_path):
-            return
+            return None, None
         image_paths = video_to_frames(video_path)
-        return image_paths
+        return image_paths, video_path
 
     def _summarize_runlog(self):
         self.rl_run.communicate()
@@ -651,7 +658,10 @@ class RewardNode(Node):
 
                 # Add reward components log to the feedback
                 for metric in tensorboard_logs:
-                    if metric.startswith("Episode Reward/") and "/terminate_" not in metric:
+                    if (
+                        metric.startswith("Episode Reward/")
+                        and "/terminate_" not in metric
+                    ):
                         metric_cur = [
                             "{:.2f}".format(x)
                             for x in tensorboard_logs[metric][::epoch_freq]
@@ -668,10 +678,12 @@ class RewardNode(Node):
                             metric_name = "Success score"
                         content += f"{metric_name}: {metric_cur}, Max: {metric_cur_max:.2f}, Mean: {metric_cur_mean:.2f}, Min: {metric_cur_min:.2f} \n"
             except Exception as e:
-                logging.error(f'Failed to analyze tensorboard logs!')
+                logging.error(f"Failed to analyze tensorboard logs!")
                 # Otherwise, provide execution traceback error feedback
                 success = DUMMY_FAILURE
-                content += self.execution_error_feedback.format(traceback_msg=traceback_msg)
+                content += self.execution_error_feedback.format(
+                    traceback_msg=traceback_msg
+                )
                 self.remove()
         else:
             # Otherwise, provide execution traceback error feedback
@@ -998,28 +1010,46 @@ class TaskNode(Node):
         self.children = []
         num_optimized = []
         num_succ = []
+        variant_videos = []
+        candidate_videos = []
         for success_child in children_bak:
             if success_child.best_reward is not None:
                 num_optimized.append(1)
-                behavior_image_paths = success_child.best_reward.play()
+                behavior_image_paths, video_path = success_child.best_reward.play()
                 succ = behavior_captioner.conclude(behavior_image_paths, task=self.code)
                 if succ:
                     num_succ.append(1)
                     self._collect_variant(success_child)
+                    variant_videos.append(video_path)
                     # control whether to re-use good success functions
                     self.add_child(success_child)
                 else:
                     num_succ.append(0)
                     self._collect_candidate(success_child)
+                    candidate_videos.append(video_path)
                     success_child.unlink()
             else:
                 num_succ.append(0)
                 num_optimized.append(0)
                 success_child.unlink()
+
+        def wrap_variant_video(variant_videos):
+            video_stats = {}
+            for v_path in variant_videos:
+                v_idx = v_path.split("/")[-4]
+                wandb_video = {
+                    f"variants_video_{v_idx}": wandb.Video(v_path, fps=30, format="mp4")
+                }
+                video_stats.update(wandb_video)
+            return video_stats
+
         stat = {
             "GPT-4v succ": np.array(num_succ).mean(),
             "num_optimized": np.array(num_optimized).mean(),
+            **wrap_variant_video(variant_videos),
+            **wrap_variant_video(candidate_videos),
         }
+
         return stat
 
     def _collect_variant(self, child):
