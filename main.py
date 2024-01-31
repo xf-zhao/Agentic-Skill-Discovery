@@ -1,7 +1,9 @@
 import hydra
+import wandb
 import logging
 import os
 import openai
+from omegaconf import  OmegaConf
 from pathlib import Path
 from eurekaplus.utils.misc import *
 from eurekaplus.utils.extract_task_code import *
@@ -12,14 +14,14 @@ from zero_hero.core import EnvNode
 ZEROHERO_ROOT_DIR = f"{os.getcwd()}"
 
 
-def learn_next_skill(env_node: EnvNode, cfg, bc):
+def learn_next_skill(i_task, env_node: EnvNode, cfg, bc, wandbrun=None):
     task_nodes = env_node.propose(
         n_samples=cfg.n_success_samples, temperature=cfg.temperature, model=cfg.model
     )
     for task_node in task_nodes:
         logging.info(f"Learn-Next-Skill: {task_node.code}.")
         break
-    for _ in range(cfg.task_iterations):
+    for task_ite in range(cfg.task_iterations):
         if task_node.num_variants >= cfg.num_variants:
             continue
         success_nodes = task_node.propose(
@@ -28,7 +30,7 @@ def learn_next_skill(env_node: EnvNode, cfg, bc):
             temperature=cfg.temperature,
             model=cfg.model,
         )  # params for child init
-        for __ in range(cfg.reward_iterations):
+        for reward_ite in range(cfg.reward_iterations):
             for success_node in success_nodes:
                 reward_nodes = success_node.propose(
                     num_envs=cfg.num_envs,
@@ -40,8 +42,17 @@ def learn_next_skill(env_node: EnvNode, cfg, bc):
                 for node in reward_nodes:
                     node.run()
             for success_node in success_nodes:
-                success_node.collect()
-        task_node.collect(behavior_captioner=bc)  # check behavior caption
+                _, succ_stat = success_node.collect()
+                wandbrun.log(
+                    {
+                        **succ_stat,
+                        "reward_ite": reward_ite,
+                        "task_ite": task_ite,
+                        "i_task": i_task,
+                    }
+                )
+        task_stat = task_node.collect(behavior_captioner=bc)  # check behavior caption
+        wandbrun.log({**task_stat, "task_ite": task_ite, "i_task": i_task})
     env_node.collect()
     env_node.save_status()
     return env_node
@@ -52,6 +63,12 @@ def main(cfg):
     workspace_dir = Path.cwd()
     logging.info(f"Workspace: {workspace_dir}")
     openai.api_key = os.getenv("OPENAI_API_KEY")
+    my_cfg = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+    wandbrun = wandb.init(
+        project=cfg.wandb_project,
+        config=my_cfg,
+    )
+
     env = cfg.env
     model = cfg.model
     logging.info(cfg)
@@ -85,7 +102,14 @@ def main(cfg):
         if env_node.num_skills >= cfg.target_num_skills:
             logging.info(f"Finished accumulating {env_node.num_skills} skills.")
             break
-        learn_next_skill(env_node, cfg, bc)
+        learn_next_skill(i_task, env_node, cfg, bc, wandbrun=wandbrun)
+        wandbrun.log(
+            {
+                "i_task": i_task,
+                "num_skills": env_node.num_skills,
+                "num_impossibles": env_node.num_impossibles,
+            }
+        )
     logging.info(f"Acquired {env_node.num_skills} skills: {env_node.get_skill_list()}")
     logging.info(
         f"Gave up on {env_node.num_impossibles} impossibiles: {env_node.get_impossible_list()}"

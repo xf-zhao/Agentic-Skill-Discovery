@@ -2,4 +2,4 @@ The Python environment is
 ```python
 {env_obs_code_string}
 ```
-Use "target position" instead of "specific position" for clearity.
+Use the given "target position" instead of "random position" or vague "specific position" for clearity.

@@ -87,6 +87,11 @@ REWARD_REPLACE_INPUT = """
 class RewardsCfg:
 """
 
+SUCCESS_MUST_CONTAIN = '''
+@configclass
+class SuccessCfg:
+'''
+
 REWARD_REPLACE_OUTPUT = """
 @configclass
 class RewardsCfg:
@@ -225,6 +230,7 @@ class Node:
         self.code_format_feedback = file_to_string(
             f"{self.prompt_dir}/reward/code_format_feedback.txt"
         )
+        self.num_syntax_error = 0
 
     def init(self):
         if self.idx is None:
@@ -329,6 +335,7 @@ class Node:
                     messages.extend(
                         [response["message"], self._wrap_user_message(err_feedback)]
                     )
+                    self.num_syntax_error += 1
                     response = None
                 else:
                     for k, v in replacements.items():
@@ -353,6 +360,14 @@ class Node:
     ):
         if code is None:
             return False, self.code_format_feedback
+        if self.type == 'Success':
+            must_contain = REWARD_REPLACE_INPUT
+        elif self.type =='Task':
+            must_contain = SUCCESS_MUST_CONTAIN
+        else:
+            must_contain = ''
+        if must_contain.strip('\n').strip() not in code:
+            return False, f'Please always configure with exact `{must_contain}`! No other new names.'
         err_feedback = None
         for k, v in replacements.items():
             code = code.replace(k, v)
@@ -580,7 +595,7 @@ class RewardNode(Node):
         return
 
     def _block_until_play_recorded(self):
-        self.play_run.communicate(timeout=600*10)
+        self.play_run.communicate(timeout=600 * 10)
         pattern = r".*(Loading model checkpoint from.*)"
         play_log = file_to_string(self.play_filepath)
         model_path_reg = re.search(pattern=pattern, string=play_log)
@@ -619,37 +634,45 @@ class RewardNode(Node):
         assert traceback_msg is not None
         if traceback_msg == "":
             # If RL execution has no error, provide policy statistics feedback
-            exec_success = True
-            success_reward_key = "Episode Reward/success"
-            lines = stdout_str.split("\n")
-            for i, line in enumerate(lines):
-                if line.startswith("Log Directory:"):
-                    break
-            tensorboard_logdir = line.split(":")[-1].strip()
-            tensorboard_logs = load_tensorboard_logs(tensorboard_logdir)
-            max_iterations = np.array(tensorboard_logs[success_reward_key]).shape[0]
-            epoch_freq = max(int(max_iterations // 10), 1)
+            # but may no logs at all
+            try:
+                exec_success = True
+                success_reward_key = "Episode Reward/success"
+                lines = stdout_str.split("\n")
+                for i, line in enumerate(lines):
+                    if line.startswith("Log Directory:"):
+                        break
+                tensorboard_logdir = line.split(":")[-1].strip()
+                tensorboard_logs = load_tensorboard_logs(tensorboard_logdir)
+                max_iterations = np.array(tensorboard_logs[success_reward_key]).shape[0]
+                epoch_freq = max(int(max_iterations // 10), 1)
 
-            content += self.policy_feedback.format(epoch_freq=epoch_freq)
+                content += self.policy_feedback.format(epoch_freq=epoch_freq)
 
-            # Add reward components log to the feedback
-            for metric in tensorboard_logs:
-                if metric.startswith("Episode Reward/") and "/terminate_" not in metric:
-                    metric_cur = [
-                        "{:.2f}".format(x)
-                        for x in tensorboard_logs[metric][::epoch_freq]
-                    ]
-                    metric_cur_max = max(tensorboard_logs[metric])
-                    metric_cur_min = min(tensorboard_logs[metric])
-                    metric_cur_mean = sum(tensorboard_logs[metric]) / len(
-                        tensorboard_logs[metric]
-                    )
-                    if success_reward_key != metric:
-                        metric_name = f"Reward component `{metric}`"
-                    else:
-                        success = metric_cur_max
-                        metric_name = "Success score"
-                    content += f"{metric_name}: {metric_cur}, Max: {metric_cur_max:.2f}, Mean: {metric_cur_mean:.2f}, Min: {metric_cur_min:.2f} \n"
+                # Add reward components log to the feedback
+                for metric in tensorboard_logs:
+                    if metric.startswith("Episode Reward/") and "/terminate_" not in metric:
+                        metric_cur = [
+                            "{:.2f}".format(x)
+                            for x in tensorboard_logs[metric][::epoch_freq]
+                        ]
+                        metric_cur_max = max(tensorboard_logs[metric])
+                        metric_cur_min = min(tensorboard_logs[metric])
+                        metric_cur_mean = sum(tensorboard_logs[metric]) / len(
+                            tensorboard_logs[metric]
+                        )
+                        if success_reward_key != metric:
+                            metric_name = f"Reward component `{metric}`"
+                        else:
+                            success = metric_cur_max
+                            metric_name = "Success score"
+                        content += f"{metric_name}: {metric_cur}, Max: {metric_cur_max:.2f}, Mean: {metric_cur_mean:.2f}, Min: {metric_cur_min:.2f} \n"
+            except Exception as e:
+                logging.error(f'Failed to analyze tensorboard logs!')
+                # Otherwise, provide execution traceback error feedback
+                success = DUMMY_FAILURE
+                content += self.execution_error_feedback.format(traceback_msg=traceback_msg)
+                self.remove()
         else:
             # Otherwise, provide execution traceback error feedback
             success = DUMMY_FAILURE
@@ -698,6 +721,7 @@ class SuccessNode(Node):
             {
                 "max_success_overall": DUMMY_FAILURE,
                 "execute_rate": [],
+                "syntax_error": [],
                 "max_success": [],
             }
             if stats is None
@@ -780,6 +804,7 @@ class SuccessNode(Node):
         exec_successes = [child.summary["exec_success"] for child in self.children]
         any_success = np.sum(exec_successes) > 0
         stat = {
+            "syntax_error": 0.0,
             "execute_rate": 0.0,
             "max_success": DUMMY_FAILURE,
         }
@@ -792,6 +817,7 @@ class SuccessNode(Node):
             return any_success, stat
 
         successes = [child.summary["success"] for child in self.children]
+        syntax_errors = [child.num_syntax_error for child in self.children]
         # Select the best code sample based on the success rate
         best_sample_idx = np.argmax(np.array(successes))
         best_reward = self.children[best_sample_idx]
@@ -813,10 +839,11 @@ class SuccessNode(Node):
         # some statistic report
         max_success = best_reward.summary["success"]
         execute_rate = np.array(successes).mean()
+        avg_syntax_error = np.array(syntax_errors).mean()
 
         self.ite += 1
         logging.info(
-            f"Iteration {self.ite}: Max Success: {max_success}, Execute Rate: {execute_rate}"
+            f"Iteration {self.ite}: Max Success: {max_success}, Execute Rate: {execute_rate}, Avg Syntax Error: {avg_syntax_error}"
         )
         logging.info(f"Iteration {self.ite}: Best Generation ID: {best_reward.idx}")
         logging.info(
@@ -837,6 +864,7 @@ class SuccessNode(Node):
             self.best_reward = best_reward
 
         stat = {
+            "syntax_error": avg_syntax_error,
             "execute_rate": execute_rate,
             "max_success": max_success,
         }
@@ -968,20 +996,31 @@ class TaskNode(Node):
     def collect(self, behavior_captioner: BehaviorCaptioner = None):
         children_bak = self.children.copy()
         self.children = []
+        num_optimized = []
+        num_succ = []
         for success_child in children_bak:
             if success_child.best_reward is not None:
+                num_optimized.append(1)
                 behavior_image_paths = success_child.best_reward.play()
                 succ = behavior_captioner.conclude(behavior_image_paths, task=self.code)
                 if succ:
+                    num_succ.append(1)
                     self._collect_variant(success_child)
                     # control whether to re-use good success functions
                     self.add_child(success_child)
                 else:
+                    num_succ.append(0)
                     self._collect_candidate(success_child)
                     success_child.unlink()
             else:
+                num_succ.append(0)
+                num_optimized.append(0)
                 success_child.unlink()
-        return
+        stat = {
+            "GPT-4v succ": np.array(num_succ).mean(),
+            "num_optimized": np.array(num_optimized).mean(),
+        }
+        return stat
 
     def _collect_variant(self, child):
         self.variants.append(child)
