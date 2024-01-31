@@ -411,6 +411,7 @@ class RewardNode(Node):
         self.runable = True
         self.num_envs = num_envs
         self.rl_run = None
+        self.play_run = None
         self.rl_filepath = None
         self.play_filepath = None
         self.memory_requirement = memory_requirement
@@ -527,7 +528,7 @@ class RewardNode(Node):
         self._prepare_launch()
 
         # Execute the python file with flags
-        rl_run_command = [
+        play_run_command = [
             f"{ORBIT_ROOT_DIR}/orbit.sh",
             "-p",
             f"{self.root_dir}/rsl_rl/play.py",
@@ -540,13 +541,13 @@ class RewardNode(Node):
             os.path.dirname(self.log_dir),
         ]
         if self.headless:
-            rl_run_command.append("--headless")
-            rl_run_command.append("--offscreen_render")
+            play_run_command.append("--headless")
+            play_run_command.append("--offscreen_render")
         self.play_filepath = self.rl_filepath.rstrip(".txt") + "_play.txt"
-        print(f"Executing commands: {rl_run_command}")
+        print(f"Executing commands: {play_run_command}")
         with open(self.play_filepath, "w") as f:
-            self.rl_run = subprocess.Popen(
-                rl_run_command,
+            self.play_run = subprocess.Popen(
+                play_run_command,
                 stdout=f,
                 stderr=f,
             )
@@ -579,23 +580,19 @@ class RewardNode(Node):
         return
 
     def _block_until_play_recorded(self):
-        image_paths = None
+        self.play_run.communicate()
         pattern = r".*(Loading model checkpoint from.*)"
-        for _ in range(60 * 5):  # 5 mins throw error
-            play_log = file_to_string(self.play_filepath)
-            model_path_reg = re.search(pattern=pattern, string=play_log)
-            if model_path_reg is None:
-                time.sleep(1)
-                continue
-            video_dir = (
-                model_path_reg.group(1).split(":")[1].strip().replace(".pt", "_videos")
-            )
-            video_path = f"{video_dir}/rl-video-step-0.mp4"
-            if not os.path.exists(video_path):
-                time.sleep(1)
-                continue
-            image_paths = video_to_frames(video_path)
-            break
+        play_log = file_to_string(self.play_filepath)
+        model_path_reg = re.search(pattern=pattern, string=play_log)
+        if model_path_reg is None:
+            return
+        video_dir = (
+            model_path_reg.group(1).split(":")[1].strip().replace(".pt", "_videos")
+        )
+        video_path = f"{video_dir}/rl-video-step-0.mp4"
+        if not os.path.exists(video_path):
+            return
+        image_paths = video_to_frames(video_path)
         return image_paths
 
     def _summarize_runlog(self):

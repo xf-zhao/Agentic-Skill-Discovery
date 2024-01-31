@@ -3,8 +3,10 @@ import logging, time
 import base64
 import openai
 import os
-from eurekaplus.utils.extract_task_code import file_to_string
 
+def file_to_string(filename):
+    with open(filename, 'r') as file:
+        return file.read()
 
 def video_to_frames(video_file):
     if not os.path.exists(video_file):
@@ -61,6 +63,9 @@ class BehaviorCaptioner:
         return msg
 
     def conclude(self, image_paths, task: str = ""):
+        if image_paths is None:
+            logging.warning(f'No behavior images to describe.')
+            return
         msg = self.describe(image_paths=image_paths, task=task)
         description = msg["message"]["content"]
         if self.save:
@@ -91,3 +96,7 @@ class BehaviorCaptioner:
     def _encode_image(self, image_path):
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode("utf-8")
+
+
+x = video_to_frames(video_file='/data/xufeng/workspace/zero_hero/envs_gpt/franka_table/Rafbbee58/logs/model_1999_videos/rl-video-step-0.mp4')
+pass

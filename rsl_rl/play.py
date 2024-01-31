@@ -50,7 +50,7 @@ parser.add_argument(
 parser.add_argument(
     "--steps",
     type=int,
-    default=500,
+    default=400,
     help="Total steps.",
 )
 
