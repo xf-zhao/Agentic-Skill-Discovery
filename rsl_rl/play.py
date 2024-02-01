@@ -58,6 +58,10 @@ parser.add_argument(
     help="Total steps.",
 )
 
+from eurekaplus.utils.misc import set_freest_gpu
+
+set_freest_gpu()
+
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -100,6 +104,7 @@ dirname = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, dirname)
 
 import envs, envs_gpt  # noqa: F401
+
 
 
 def main():
