@@ -21,7 +21,7 @@ num_envs: 4096
 memory_requirement: 10
 video: False
 target_num_skills: 40
-task_iterations: 2 # iterate to acquire more variants
+task_iterations: 1 # iterate to acquire more variants
 n_success_samples: 3 # number of samples to generate success function per iteration
 n_reward_samples: 3 # number of samples to generate reward function per iteration
 reward_iterations: 3
