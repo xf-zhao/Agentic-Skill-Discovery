@@ -9,6 +9,7 @@ from omni.isaac.orbit.sim.utils import (
     clone,
 )
 from omni.isaac.orbit.utils.assets import check_file_path
+from omni.isaac.orbit.sim.spawners.from_files.from_files_cfg import UsdFileCfg
 
 
 def _my_spawn_from_usd_file(
@@ -73,3 +74,7 @@ def my_spawn_from_usd(
     return _my_spawn_from_usd_file(
         prim_path, cfg.usd_path, cfg, translation, orientation
     )
+
+
+class MyUsdFileCfg(UsdFileCfg):
+    func = my_spawn_from_usd

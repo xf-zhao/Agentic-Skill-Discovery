@@ -602,7 +602,7 @@ class RewardNode(Node):
         return
 
     def _block_until_play_recorded(self):
-        self.play_run.communicate(timeout=600 * 10)
+        self.play_run.communicate(timeout=60*60*1)
         pattern = r".*(Loading model checkpoint from.*)"
         play_log = file_to_string(self.play_filepath)
         model_path_reg = re.search(pattern=pattern, string=play_log)

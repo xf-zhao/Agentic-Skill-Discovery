@@ -139,7 +139,7 @@ def main():
             "video_length": args_cli.video_length,
             "disable_logger": True,
         }
-        print("[INFO] Recording videos during training.")
+        print("[INFO] Recording videos during playing.")
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
     # wrap around environment for rsl-rl
@@ -166,6 +166,7 @@ def main():
     steps = 0
     # reset environment
     obs, _ = env.get_observations()
+    print("[INFO]: reset env. Start simulating next step.")
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
@@ -187,8 +188,11 @@ if __name__ == "__main__":
         # run the main execution
         main()
     except Exception as err:
+        err_ = traceback.format_exc()
         carb.log_error(err)
-        carb.log_error(traceback.format_exc())
+        carb.log_error(err_)
+        print(err)
+        print(err_)
         raise
     finally:
         # close sim app

@@ -28,7 +28,7 @@ from omni.isaac.orbit.sim.spawners.from_files.from_files_cfg import (
     UsdFileCfg,
 )
 from omni.isaac.orbit.utils import configclass
-from omni.isaac.orbit.utils.assets import ISAAC_NUCLEUS_DIR
+from omni.isaac.orbit.utils.assets import ISAAC_NUCLEUS_DIR, NVIDIA_NUCLEUS_DIR
 from omni.isaac.orbit.assets import ArticulationCfg, AssetBaseCfg
 from omni.isaac.orbit.sim.schemas.schemas_cfg import (
     RigidBodyPropertiesCfg,
@@ -56,7 +56,7 @@ if TYPE_CHECKING:
 
 from envs.franka_table import mdp
 
-# from .utils import my_spawn_from_usd
+from ..utils import MyUsdFileCfg
 
 ##
 # Scene definition
@@ -176,12 +176,12 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         init_state=RigidObjectCfg.InitialStateCfg(
             pos=[0.5, 0, 0.055], rot=[1, 0, 0, 0]
         ),
-        spawn=UsdFileCfg(
+        spawn=MyUsdFileCfg(
             usd_path=f"{ZEROHERO_ROOT_DIR}/envs/franka_table/assets/plate.usd",
             scale=(
-                0.65e-2,
-                0.65e-2,
-                0.65e-2,
+                0.65,
+                0.65,
+                0.65,
             ),
             rigid_props=RigidBodyPropertiesCfg(
                 solver_position_iteration_count=16,
