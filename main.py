@@ -3,7 +3,7 @@ import wandb
 import logging
 import os
 import openai
-from omegaconf import  OmegaConf
+from omegaconf import OmegaConf
 from pathlib import Path
 from eurekaplus.utils.misc import *
 from eurekaplus.utils.extract_task_code import *
@@ -51,9 +51,19 @@ def learn_next_skill(i_task, env_node: EnvNode, cfg, bc, wandbrun=None):
                         "i_task": i_task,
                     }
                 )
-        task_stat = task_node.collect(behavior_captioner=bc)  # check behavior caption
-        wandbrun.log({**task_stat, "task_ite": task_ite, "i_task": i_task})
-    env_node.collect()
+            task_stat = task_node.collect(
+                behavior_captioner=bc
+            )  # check behavior caption
+            wandbrun.log(
+                {
+                    **task_stat,
+                    "task_ite": task_ite,
+                    "i_task": i_task,
+                    "reward_ite": reward_ite,
+                }
+            )
+    env_stat = env_node.collect()
+    wandbrun.log({"i_task": i_task, **env_stat})
     env_node.save_status()
     return env_node
 
@@ -103,13 +113,7 @@ def main(cfg):
             logging.info(f"Finished accumulating {env_node.num_skills} skills.")
             break
         learn_next_skill(i_task, env_node, cfg, bc, wandbrun=wandbrun)
-        wandbrun.log(
-            {
-                "i_task": i_task,
-                "num_skills": env_node.num_skills,
-                "num_impossibles": env_node.num_impossibles,
-            }
-        )
+
     logging.info(f"Acquired {env_node.num_skills} skills: {env_node.get_skill_list()}")
     logging.info(
         f"Gave up on {env_node.num_impossibles} impossibiles: {env_node.get_impossible_list()}"

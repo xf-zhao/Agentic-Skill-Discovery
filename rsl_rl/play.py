@@ -10,8 +10,10 @@ from __future__ import annotations
 """Launch Isaac Sim Simulator first."""
 
 
+from tqdm import tqdm
 import argparse
 import os
+import json
 
 from omni.isaac.orbit.app import AppLauncher
 
@@ -36,25 +38,23 @@ parser.add_argument(
 parser.add_argument(
     "--video", action="store_true", default=False, help="Record videos during training."
 )
-parser.add_argument(
-    "--log_root", type=str, default=None, help="Saved model path."
-)
+parser.add_argument("--log_root", type=str, default=None, help="Saved model path.")
 parser.add_argument(
     "--video_length",
     type=int,
-    default=200,
+    default=250,
     help="Length of the recorded video (in steps).",
 )
 parser.add_argument(
     "--video_interval",
     type=int,
-    default=400,
+    default=250,
     help="Interval between video recordings (in steps).",
 )
 parser.add_argument(
     "--steps",
     type=int,
-    default=300,
+    default=250,
     help="Total steps.",
 )
 
@@ -106,7 +106,6 @@ sys.path.insert(0, dirname)
 import envs, envs_gpt  # noqa: F401
 
 
-
 def main():
     """Play with RSL-RL agent."""
     # parse configuration
@@ -118,7 +117,11 @@ def main():
     )
 
     # specify directory for logging experiments
-    log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name) if args_cli.log_root is None else args_cli.log_root
+    log_root_path = (
+        os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
+        if args_cli.log_root is None
+        else args_cli.log_root
+    )
     log_root_path = os.path.abspath(log_root_path)
     print(f"[INFO] Loading experiment from directory: {log_root_path}")
     resume_path = get_checkpoint_path(
@@ -141,7 +144,8 @@ def main():
         video_kwargs = {
             "video_folder": log_dir,
             "step_trigger": lambda step: step % args_cli.video_interval == 0,
-            "video_length": args_cli.video_length,
+            # "video_length": args_cli.video_length,
+            "video_length": env.unwrapped.max_episode_length,
             "disable_logger": True,
         }
         print("[INFO] Recording videos during playing.")
@@ -166,26 +170,49 @@ def main():
         export_policy_as_onnx(
             ppo_runner.alg.actor_critic, export_model_dir, filename="policy.onnx"
         )
-        print(f'[INFO]: Exported policy.onnx')
+        print(f"[INFO]: Exported policy.onnx")
 
-    steps = 0
     # reset environment
+    user_obss = []
     obs, _ = env.get_observations()
     print("[INFO]: reset env. Start simulating next step.")
     # simulate environment
-    while simulation_app.is_running():
+    # while simulation_app.is_running():
+    for i in tqdm(range(env.max_episode_length)):
         # run everything in inference mode
         with torch.inference_mode():
             # agent stepping
             actions = policy(obs)
             # env stepping
-            obs, _, _, _ = env.step(actions)
-            steps += 1
-            if steps > args_cli.steps:
-                break
+            obs, _, _, extras = env.step(actions)
+            if i in (6, env.max_episode_length - 10):
+                data = extras["observations"]["observations"]
+                data_str = {}
+                for k, v in data.items():
+                    if k in ("actions",):
+                        continue
+                    if v.reshape(-1).shape[0] > 1:
+                        _v = (
+                            "["
+                            + ", ".join(
+                                [f"{vv:.2f}" for vv in v.squeeze().cpu().numpy()]
+                            )
+                            + "]"
+                        )
+                    else:
+                        _v = f"{v.squeeze().cpu().numpy():.2f}"
+                    data_str[k] = _v
+                user_obss.append(data_str)
 
     # close the simulator
     env.close()
+
+    obs_json = {"first_frame": user_obss[0], "end_frame": user_obss[-1]}
+    obs_json_str = json.dumps(obs_json)
+    obs_path = f"{log_dir}/rl-video-step-0-obs.json"
+    with open(obs_path, "w") as obsf:
+        obsf.write(obs_json_str)
+    return
 
 
 if __name__ == "__main__":

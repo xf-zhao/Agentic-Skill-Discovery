@@ -200,7 +200,9 @@ class Node:
         n_samples=1,
         temperature=0,
         ite=0,
+        resume=True,
     ) -> None:
+        self.resume = resume
         self.root_dir = root_dir if root_dir is not None else ZERO_HERO_ROOT_DIR
         self.prompt_dir = f"{self.root_dir}/eurekaplus/utils/prompts"
         self.env_name = env_name
@@ -451,31 +453,34 @@ class RewardNode(Node):
     def init(self):
         super().init()
         cur_env_dir = f"{self.root_dir}/envs_gpt/{self.env_name}/{self.idx}"
-        self.rl_filepath = (
-            f"{self.parent.parent.idx}-{self.parent.idx}-{self.idx}-{self.ite}.txt"
-        )
+        self.rl_filepath = f"{self.idx}-{self.ite}.txt"
         self.cur_env_dir = cur_env_dir
         self.log_dir = f"{self.cur_env_dir}/logs"
-        if os.path.exists(cur_env_dir):
-            shutil.rmtree(cur_env_dir)
-            logging.info(f"Remove directory {cur_env_dir}.")
-        os.makedirs(cur_env_dir)
-
-        shutil.copy(self.env_file, cur_env_dir)
-        shutil.copy(self.env_obs_file, cur_env_dir)
-        shutil.copy(self.termination_file, cur_env_dir)
-        with open(f"{cur_env_dir}/__init__.py", "w") as f:
-            f.write(MODULE_INIT.replace("UUID_HEX", self.idx))
-
-        success_file = f"{cur_env_dir}/success.py"
-        with open(success_file, "w") as file:
-            file.write(SUCCESS_INIT)
-            file.writelines(self.parent.code + "\n")
 
         reward_file = f"{cur_env_dir}/reward.py"
-        with open(reward_file, "w") as file:
-            file.write(REWARD_INIT)
-            file.writelines(self.code + "\n")
+        if os.path.exists(cur_env_dir):
+            if not self.resume:
+                shutil.rmtree(cur_env_dir)
+                logging.info(f"Remove directory {cur_env_dir}.")
+            with open(reward_file, "r") as file:
+                self.code = file.read()
+        else:
+            os.makedirs(cur_env_dir, exist_ok=True)
+
+            shutil.copy(self.env_file, cur_env_dir)
+            shutil.copy(self.env_obs_file, cur_env_dir)
+            shutil.copy(self.termination_file, cur_env_dir)
+            with open(f"{cur_env_dir}/__init__.py", "w") as f:
+                f.write(MODULE_INIT.replace("UUID_HEX", self.idx))
+
+            success_file = f"{cur_env_dir}/success.py"
+            with open(success_file, "w") as file:
+                file.write(SUCCESS_INIT)
+                file.writelines(self.parent.code + "\n")
+
+            with open(reward_file, "w") as file:
+                file.write(REWARD_INIT)
+                file.writelines(self.code + "\n")
 
         return self
 
@@ -500,7 +505,6 @@ class RewardNode(Node):
                 break
             else:
                 if i % 60 == 0:
-                    logging.info(f"")
                     logging.info(
                         f"Available mem: {available_mem}. (Require {self.memory_requirement}). Waiting for enough mem to run node {self.idx}. Time elapsed: {i//6} minutes."
                     )
@@ -566,14 +570,9 @@ class RewardNode(Node):
         self.play_filepath = self.rl_filepath.rstrip(".txt") + "_play.txt"
         print(f"Executing commands: {play_run_command}")
         with open(self.play_filepath, "w") as f:
-            self.play_run = subprocess.Popen(
-                play_run_command,
-                stdout=f,
-                stderr=f,
-            )
+            self.play_run = subprocess.Popen(play_run_command, stdout=f, stderr=f)
         behavior_image_paths, video_path = self._block_until_play_recorded()
-        if video_path is not None:
-            self.video_path = video_path
+        self.video_path = video_path
         return behavior_image_paths, video_path
 
     def summarize(self):
@@ -602,7 +601,7 @@ class RewardNode(Node):
         return
 
     def _block_until_play_recorded(self):
-        self.play_run.communicate(timeout=60*60*1)
+        self.play_run.communicate(timeout=60 * 60 * 1)
         pattern = r".*(Loading model checkpoint from.*)"
         play_log = file_to_string(self.play_filepath)
         model_path_reg = re.search(pattern=pattern, string=play_log)
@@ -1028,12 +1027,14 @@ class TaskNode(Node):
                     num_v_succ.append(0)
                 if v_succ and f_succ:
                     self._collect_variant(success_child)
-                    variant_videos.append(video_path)
+                    if video_path is not None:
+                        variant_videos.append(video_path)
                     # control whether to re-use good success functions
                     self.add_child(success_child)
                 else:
                     self._collect_candidate(success_child)
-                    candidate_videos.append(video_path)
+                    if video_path is not None:
+                        candidate_videos.append(video_path)
                     success_child.unlink()
             else:
                 num_f_succ.append(0)
@@ -1085,7 +1086,6 @@ class EnvNode(Node):
         idx="E00",
         skills=None,
         impossibles=None,
-        resume=True,
         graph_output=None,
         status_output=None,
         *args,
@@ -1093,7 +1093,6 @@ class EnvNode(Node):
     ) -> None:
         super().__init__(*args, **kwargs)
         self.idx = idx
-        self.resume = resume
         self.G = nx.DiGraph()
         self.type = "Env"
         self.code = None
@@ -1329,7 +1328,11 @@ class EnvNode(Node):
     def collect(self):
         for task_child in self.children:
             self._collect_skill(task_child)
-        return
+        stat = {
+            "num_skills": self.num_skills,
+            "num_impossibles": self.num_impossibles,
+        }
+        return stat
 
     def _propose(self, temperature_increase=0) -> List[TaskNode]:
         self.init()

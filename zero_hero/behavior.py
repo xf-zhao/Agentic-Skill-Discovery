@@ -1,16 +1,19 @@
 import imageio.v3 as iio
+import json
 import logging, time
 import base64
 import openai
 import os
 
+
 def file_to_string(filename):
-    with open(filename, 'r') as file:
+    with open(filename, "r") as file:
         return file.read()
+
 
 def video_to_frames(video_file):
     if not os.path.exists(video_file):
-        logging.error(f'Video file {video_file} does not exist')
+        logging.error(f"Video file {video_file} does not exist")
         return
     file_dir = os.path.dirname(video_file)
     frames = iio.imread(video_file)
@@ -26,15 +29,23 @@ def video_to_frames(video_file):
     return paths
 
 
+def read_obs(obsfile):
+    with open(obsfile, "r") as obsf:
+        obs_data = json.load(obsf)
+    return obs_data
+
+
 class BehaviorCaptioner:
     def __init__(
-        self, init_sys_prompt, model="gpt-4-vision-preview", save=True
+        self, init_sys_prompt, model="gpt-4-vision-preview", save=True, caption_output='caption.txt'
     ) -> None:
         self.init_sys_prompt = file_to_string(init_sys_prompt)
         self.model = model
         self.save = save
+        self.caption_output = caption_output
 
-    def describe(self, image_paths, task: str = ""):
+    def describe(self, image_paths, state_path, task: str = ""):
+        obs_data = read_obs(state_path)
         image_contents = [
             self.make_image_content(image_path) for image_path in image_paths
         ]
@@ -46,7 +57,13 @@ class BehaviorCaptioner:
                         {
                             "role": "system",
                             "content": [
-                                {"type": "text", "text": self.init_sys_prompt},
+                                {
+                                    "type": "text",
+                                    "text": self.init_sys_prompt.format(
+                                        first_frame=obs_data["first_frame"],
+                                        end_frame=obs_data["end_frame"],
+                                    ),
+                                },
                             ],
                         },
                         {"role": "user", "content": [*image_contents, task]},
@@ -64,13 +81,13 @@ class BehaviorCaptioner:
 
     def conclude(self, image_paths, task: str = ""):
         if image_paths is None:
-            logging.warning(f'No behavior images to describe.')
+            logging.warning(f"No behavior images to describe.")
             return
         msg = self.describe(image_paths=image_paths, task=task)
         description = msg["message"]["content"]
         if self.save:
             log_dir = os.path.dirname(image_paths[0])
-            with open(f"{log_dir}/caption.txt", "w") as fcap:
+            with open(f"{log_dir}/{self.caption_output}", "w") as fcap:
                 fcap.write(description)
         if "SUCCESS" in description:
             succ = True

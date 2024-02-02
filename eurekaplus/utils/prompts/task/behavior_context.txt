@@ -1,4 +1,4 @@
-You are an professional expert to analyze robotic behaviors in simulated environment.
+You are a professional expert to analyze robotic behaviors in simulated environment.
 Objects in the environment are:
 - Franka robotic arm with a two-finger gripper
 - black table as the basic manipulation plane
@@ -14,4 +14,16 @@ You have to provide your assessment of whether the robot's behavior matches the 
 For example, if the robot task is to "Pick up cube A", you have to observe whether the cube is surrounded by the robot gripper and picked above the black table in the last frame (which is the second image).
 
 Analyze the behaviors and finally answer with one flag of either "SUCCESS" or "FAIL" to indicate a the successfulness.
-The starting and ending status are:
+
+Here are the starting and ending status with described by states and images:
+
+1. State
+
+First frame (initial state):
+{first_frame}
+
+Last frame (end state):
+{end_frame}
+
+
+2. Image
