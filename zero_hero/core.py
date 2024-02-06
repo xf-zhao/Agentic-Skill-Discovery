@@ -498,7 +498,7 @@ class RewardNode(Node):
         for i in range(
             max_waiting
         ):  # Maximum 4 hour waiting time, long enough for finishing one run
-            available_mem = psutil.virtual_memory().free / 1024 / 1024 / 1024
+            available_mem = psutil.virtual_memory().available / 1024 / 1024 / 1024
             if (
                 available_mem > self.memory_requirement
             ):  # 16 GB is the minimum mem for a new instance
@@ -571,9 +571,9 @@ class RewardNode(Node):
         print(f"Executing commands: {play_run_command}")
         with open(self.play_filepath, "w") as f:
             self.play_run = subprocess.Popen(play_run_command, stdout=f, stderr=f)
-        behavior_image_paths, video_path = self._block_until_play_recorded()
-        self.video_path = video_path
-        return behavior_image_paths, video_path
+        playbacks = self._block_until_play_recorded()
+        self.video_path = playbacks["video"]
+        return playbacks
 
     def summarize(self):
         summary = self._summarize_runlog()
@@ -611,10 +611,17 @@ class RewardNode(Node):
             model_path_reg.group(1).split(":")[1].strip().replace(".pt", "_videos")
         )
         video_path = f"{video_dir}/rl-video-step-0.mp4"
+        obs_path = f"{video_dir}/rl-video-step-0-obs.json"
         if not os.path.exists(video_path):
             return None, None
         image_paths = video_to_frames(video_path)
-        return image_paths, video_path
+        playbacks = {
+            "dir": video_dir,
+            "image": image_paths,
+            "video": video_path,
+            "state": obs_path,
+        }
+        return playbacks
 
     def _summarize_runlog(self):
         self.rl_run.communicate()
@@ -1015,9 +1022,15 @@ class TaskNode(Node):
         for success_child in children_bak:
             if success_child.best_reward is not None:
                 num_optimized.append(1)
-                behavior_image_paths, video_path = success_child.best_reward.play()
+                (
+                    behavior_image_paths,
+                    video_path,
+                    obs_path,
+                ) = success_child.best_reward.play()
                 v_succ = behavior_captioner.conclude(
-                    behavior_image_paths, task=self.code
+                    image_paths=behavior_image_paths,
+                    state_path=obs_path,
+                    task=self.code,
                 )
                 f_succ = int(success_child.best_reward.summary["success"] > 0)
                 num_f_succ.append(f_succ)

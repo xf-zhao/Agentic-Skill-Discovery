@@ -37,17 +37,21 @@ def read_obs(obsfile):
 
 class BehaviorCaptioner:
     def __init__(
-        self, init_sys_prompt, model="gpt-4-vision-preview", save=True, caption_output='caption.txt'
+        self,
+        init_sys_prompt,
+        model="gpt-4-vision-preview",
+        save=True,
+        caption_output="caption.txt",
     ) -> None:
         self.init_sys_prompt = file_to_string(init_sys_prompt)
         self.model = model
         self.save = save
         self.caption_output = caption_output
 
-    def describe(self, image_paths, state_path, task: str = ""):
-        obs_data = read_obs(state_path)
+    def describe(self, playbacks:dict, task: str = ""):
+        obs_data = read_obs(playbacks['state'])
         image_contents = [
-            self.make_image_content(image_path) for image_path in image_paths
+            self.make_image_content(image_path) for image_path in playbacks['image']
         ]
         for attempt in range(10):
             try:
@@ -77,24 +81,24 @@ class BehaviorCaptioner:
                 logging.info(err_msg)
                 time.sleep(1)
         msg = response.choices[0]
-        return msg
-
-    def conclude(self, image_paths, task: str = ""):
-        if image_paths is None:
-            logging.warning(f"No behavior images to describe.")
-            return
-        msg = self.describe(image_paths=image_paths, task=task)
         description = msg["message"]["content"]
         if self.save:
-            log_dir = os.path.dirname(image_paths[0])
-            with open(f"{log_dir}/{self.caption_output}", "w") as fcap:
+            with open(f"{playbacks['dir']}/{self.caption_output}", "w") as fcap:
                 fcap.write(description)
+        return description
+
+    def conclude(self, playbacks:dict, task: str = ""):
+        if playbacks['image'] is None:
+            logging.warning(f"No behavior images to describe.")
+            return
+        description = self.describe( playbacks , task=task
+        )
         if "SUCCESS" in description:
             succ = True
         elif "FAIL" in description:
             succ = False
         else:
-            succ = None
+            succ = None # future work
         return succ
 
     def make_image_content(self, image_path):
