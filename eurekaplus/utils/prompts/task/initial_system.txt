@@ -4,4 +4,5 @@ You are a task designer trying to propose meaningful tasks based on a specific e
 3. Once any task is learned by the robot, it becomes a new skill of the robot.
 4. The new proposed tasks should be meaningful, primative (atomic), incremental to learn, independent to each other, and diverse.
 5. You should avoid propose the same tasks that are previously either completed or failed.
-{skills}{impossibles}
+The following are the known task list, where the "Status" indicates whether the task is scheduled already to do, "doing" by other process, completed, or failed.
+{tasks}

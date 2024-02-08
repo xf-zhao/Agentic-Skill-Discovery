@@ -18,6 +18,7 @@ from eurekaplus.utils.misc import *
 from eurekaplus.utils.file_utils import load_tensorboard_logs
 from eurekaplus.utils.extract_task_code import *
 from .behavior import BehaviorCaptioner, video_to_frames
+from .task import TaskDatabase
 
 
 DUMMY_FAILURE = -10000.0
@@ -921,7 +922,9 @@ class SuccessNode(Node):
 
 
 class TaskNode(Node):
-    def __init__(self, variants=None, candidates=None, *args, **kwargs) -> None:
+    def __init__(
+        self, variants=None, status_output=None, candidates=None, *args, **kwargs
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Task"
         self.initial_system = file_to_string(
@@ -942,6 +945,11 @@ class TaskNode(Node):
         )
         self.variants = [] if variants is None else variants
         self.candidates = [] if candidates is None else candidates
+        if status_output is None:
+            status_dir = f"{self.root_dir}/envs_gpt/status"
+            status_output = f"{status_dir}/{self.env_name}_{self.idx}.json"
+            if not os.path.exists(status_dir):
+                os.makedirs(status_dir)
 
     @property
     def num_variants(self):
@@ -1092,10 +1100,89 @@ class TaskNode(Node):
         )
         return
 
+    def save_status(self):
+        def get_variant_tree(variant):
+            tree = {
+                "best_reward": {
+                    variant.best_reward.idx: {
+                        "priors": variant.best_reward.priors,
+                        "summary": variant.best_reward.summary,
+                    }
+                },
+                "stats": variant.stats,
+            }
+            return tree
+
+        def get_variant_forest(variants):
+            forest = {variant.idx: get_variant_tree(variant) for variant in variants}
+            return forest
+
+        def get_skill_tree(skill):
+            tree = {
+                "code": skill.code,
+                "variants": get_variant_forest(skill.variants),
+                "candidates": get_variant_forest(skill.candidates),
+            }
+            return tree
+
+        def get_skill_forest(skills):
+            forest = {skill.idx: get_skill_tree(skill) for skill in skills}
+            return forest
+
+        status = {
+            "Env": self.env_name,
+            "idx": self.idx,
+            "skills": get_skill_forest(self.skills),
+            "impossibles": get_skill_forest(self.impossibles),
+        }
+        with open(self.status_output, "w") as fout:
+            data_json = json.dumps(status)
+            fout.write(data_json + "\n")
+            logging.info(f"Saved status {self.idx} to {self.status_output}")
+        self.status = status
+        return
+
+    def load_status(self, status_input=None):
+        if status_input is None:
+            status_input = self.status_output
+        if not os.path.exists(status_input):
+            logging.info(f"No status found in {status_input}, creating a new one.")
+            return self
+        with open(status_input, "r") as fin:
+            status = json.load(fin)
+        self.idx = status["idx"]
+        self.env_name = status["Env"]
+
+        def build_status(key="skills"):
+            skills = []
+            for skill_idx, skill_tree in status[key].items():
+                skill = TaskNode(idx=skill_idx, code=skill_tree["code"])
+                variants = []
+                for variant_idx, variant_tree in skill_tree["variants"].items():
+                    variant = SuccessNode(idx=variant_idx, stats=variant_tree["stats"])
+                    for reward_idx, reward_values in variant_tree[
+                        "best_reward"
+                    ].items():
+                        best_reward_node = RewardNode(
+                            idx=reward_idx, priors=reward_values["priors"]
+                        )
+                        best_reward_node.summary = reward_values["summary"]
+                        break
+                    variant.best_reward = best_reward_node
+                    variants.append(variant)
+                skill.variants = variants
+                skills.append(skill)
+            return skills
+
+        self.skills = build_status("skills")
+        self.impossibles = build_status("impossibles")
+        return self
+
 
 class EnvNode(Node):
     def __init__(
         self,
+        task_database: TaskDatabase,
         idx="E00",
         skills=None,
         impossibles=None,
@@ -1105,6 +1192,7 @@ class EnvNode(Node):
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
+        self.task_database = task_database
         self.idx = idx
         self.G = nx.DiGraph()
         self.type = "Env"
@@ -1155,21 +1243,9 @@ class EnvNode(Node):
 
     def init(self):
         super().init()
-        if self.num_skills > 0:
-            skill_list_str = f"We have already acquired {self.num_skills} skills:\n{self.get_skill_list()}\n"
-        else:
-            skill_list_str = ""
-        if self.num_impossibles > 0:
-            im_list_str = f"Previously we tried but failed to learn the following {self.num_impossibles} skills:\n{self.get_impossible_list()}\nMaybe consider to propose easier or clearer tasks.\n"
-        else:
-            im_list_str = ""
+        tasks_list = self.task_database.render()
         initial_system = (
-            self.initial_system.format(
-                skills_count=self.num_skills,
-                skills=skill_list_str,
-                impossibles=im_list_str,
-            )
-            + self.code_output_tip
+            self.initial_system.format(tasks=tasks_list) + self.code_output_tip
         )
         initial_user = self.initial_user.format(
             env_obs_code_string=self.env_obs_code,

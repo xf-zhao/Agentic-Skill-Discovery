@@ -9,6 +9,7 @@ from eurekaplus.utils.misc import *
 from eurekaplus.utils.extract_task_code import *
 from zero_hero.behavior import BehaviorCaptioner
 from zero_hero.core import EnvNode
+from zero_hero.task import TaskDatabase
 
 
 ZEROHERO_ROOT_DIR = f"{os.getcwd()}"
@@ -85,8 +86,12 @@ def main(cfg):
     logging.info(f"Using LLM: {model}")
 
     env_name = cfg.env.env_name.lower()
+    tdb = TaskDatabase(
+        store_path=f'{ZEROHERO_ROOT_DIR}/envs_gpt/tasks/{env_name.replace(" ","_")}.csv'
+    )
     env_node = (
         EnvNode(
+            task_database=tdb,
             idx=f"E{cfg.seed:02d}",
             root_dir=ZEROHERO_ROOT_DIR,
             env_name=env_name,
@@ -96,9 +101,8 @@ def main(cfg):
             temperature=cfg.temperature,
             skills=[],
             impossibles=[],
-        )
-        .init()
-        .load_status()
+        ).init()
+        # .load_status()
     )
     logging.info(f"Env: {env.env_name} / {env_node.idx}")
     bc = BehaviorCaptioner(

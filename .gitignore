@@ -6,3 +6,4 @@ envs_gpt/
 outputs/
 .vscode/
 core
+*.csv

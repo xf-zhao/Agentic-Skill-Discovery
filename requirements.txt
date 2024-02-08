@@ -16,3 +16,5 @@ openai==0.28.0
 gpustat
 torch<=2.0.0
 wandb
+pandas
+Pyarrow # just to avoid warning
