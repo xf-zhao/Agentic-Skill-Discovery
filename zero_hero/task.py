@@ -1,5 +1,6 @@
-import pandas as pd
+import time
 import os
+import pandas as pd
 
 
 class TaskDatabase:
@@ -52,13 +53,17 @@ class TaskDatabase:
         print(numbered_tasks)
         return numbered_tasks
 
-    def pop(self):
-        command = None
-        df = self.df
-        indices = df.loc[df.status == "todo"].index
-        if len(indices) > 0:
-            index_to_pop = indices[0]
-            df.loc[index_to_pop, "status"] = "doing"
-            command = df.loc[index_to_pop, "command"]
-        df = self.df
-        return command
+    def pop(self, timeout=60 * 60 * 10):
+        task = None
+        itime = 0
+        while task is None and itime < timeout:
+            df = self.df
+            indices = df.loc[df.status == "todo"].index
+            if len(indices) > 0:
+                index_to_pop = indices[0]
+                df.loc[index_to_pop, "status"] = "doing"
+                task = df.loc[index_to_pop, "command"]
+            df = self.df
+            time.sleep(1)
+            itime += 1
+        return task

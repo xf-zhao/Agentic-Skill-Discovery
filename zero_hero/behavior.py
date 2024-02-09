@@ -99,7 +99,7 @@ class BehaviorCaptioner:
             succ = False
         else:
             succ = None # future work
-        return succ
+        return description, succ
 
     def make_image_content(self, image_path):
         image_base64 = self._encode_image(image_path)

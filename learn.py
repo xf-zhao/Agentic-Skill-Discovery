@@ -59,6 +59,8 @@ def main(cfg):
                     video=cfg.video,
                     memory_requirement=cfg.memory_requirement,
                     max_iterations=cfg.max_iterations,
+                    task_ite=task_ite,
+                    reward_ite=reward_ite,
                 )
                 for node in reward_nodes:
                     node.run()

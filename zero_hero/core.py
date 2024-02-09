@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import wandb
 import json
 import networkx as nx
@@ -422,13 +423,21 @@ class RewardNode(Node):
         memory_requirement=16,
         max_iterations=2000,
         priors=None,
+        record=None,
+        best_record=None,
+        task_ite=1,
+        reward_ite=1,
+        behavior_captioner: BehaviorCaptioner = None,
         *args,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Reward"
+        self.behavior_captioner = behavior_captioner
         self.task = task
         self.headless = headless
+        self.task_ite = task_ite
+        self.reward_ite = reward_ite
         self.video = video
         self.runable = True
         self.num_envs = num_envs
@@ -449,7 +458,19 @@ class RewardNode(Node):
         self.cur_env_dir = None
         self.max_iterations = max_iterations
         self.priors = [] if priors is None else priors
-        self.video_path = None
+        self.playbacks = None
+        if record is None:
+            record_dir = f"{self.root_dir}/envs_gpt/records"
+            record = f"{record_dir}/{self.env_name}_record.csv"
+            if not os.path.exists(record_dir):
+                os.makedirs(record_dir)
+        self.record = record
+        if best_record is None:
+            best_record_dir = f"{self.root_dir}/envs_gpt/records"
+            best_record = f"{best_record_dir}/{self.env_name}_best_record.csv"
+            if not os.path.exists(best_record_dir):
+                os.makedirs(best_record_dir)
+        self.best_record = best_record
 
     def init(self):
         super().init()
@@ -573,8 +594,27 @@ class RewardNode(Node):
         with open(self.play_filepath, "w") as f:
             self.play_run = subprocess.Popen(play_run_command, stdout=f, stderr=f)
         playbacks = self._block_until_play_recorded()
-        self.video_path = playbacks["video"]
+        self.playbacks = playbacks
         return playbacks
+
+    def caption(self):
+        assert self.behavior_captioner is not None
+        if self.playbacks is None:
+            self.playbacks = self.play()
+        description, v_succ = self.behavior_captioner.conclude(
+            image_paths=self.playbacks["image_paths"],
+            state_path=self.playbacks["state_path"],
+            task=self.task,
+        )
+        data = {
+            **self.playbacks,
+            "gpt-4v-succ": v_succ,
+            "gpt-4v-description": description,
+        }
+        self._write_record_line(
+            data, self.best_record
+        )  # only caption for best node of succ node
+        return data
 
     def summarize(self):
         summary = self._summarize_runlog()
@@ -597,9 +637,25 @@ class RewardNode(Node):
                 logging.error(
                     f"Iteration {self.iterations} - node {self.idx}: execution error!"
                 )
+                self.exec_success = False
+                self.success = DUMMY_FAILURE
             logging.info(f"Log at {self.rl_filepath}")
             break
         return
+
+    @property
+    def record_data(self):
+        data = {
+            "task": self.task,
+            "task_ite": self.task_ite,
+            "success_idx": self.parent.idx,
+            "reward_idx": self.idx,
+            "reward_ite": self.reward_ite,
+            "num_syntax_error": self.num_syntax_error,
+            "exec_success": self.exec_success,
+            "success": self.success,
+        }
+        return data
 
     def _block_until_play_recorded(self):
         self.play_run.communicate(timeout=60 * 60 * 1)
@@ -617,10 +673,11 @@ class RewardNode(Node):
             return None, None
         image_paths = video_to_frames(video_path)
         playbacks = {
-            "dir": video_dir,
-            "image": image_paths,
-            "video": video_path,
-            "state": obs_path,
+            "reward_idx": self.idx,
+            "video_dir": video_dir,
+            "image_paths": image_paths,
+            "video_path": video_path,
+            "state_path": obs_path,
         }
         return playbacks
 
@@ -703,7 +760,16 @@ class RewardNode(Node):
             "content": content,
             "success": success,
         }
+        self.success = success
+        self.exec_success = exec_success
+        self._write_record_line(self.record_data, self.record)
         return summary
+
+    def _write_record_line(self, data, record_file):
+        line = pd.DataFrame(data).to_csv(index=False, header=False)
+        with open(record_file, "w+") as frecord:
+            frecord.write(line)
+        return
 
 
 class SuccessNode(Node):
@@ -770,6 +836,8 @@ class SuccessNode(Node):
         headless=False,
         video=False,
         memory_requirement=10,
+        task_ite=1,
+        reward_ite=1,
     ) -> List[RewardNode]:
         self.children: List[RewardNode] = []
         responses = gpt_call(
@@ -812,6 +880,8 @@ class SuccessNode(Node):
                 headless=headless,
                 video=video,
                 memory_requirement=memory_requirement,
+                task_ite=task_ite,
+                reward_ite=reward_ite,
             )
             self.add_child(child)
             child.init()
@@ -1030,18 +1100,11 @@ class TaskNode(Node):
         for success_child in children_bak:
             if success_child.best_reward is not None:
                 num_optimized.append(1)
-                (
-                    behavior_image_paths,
-                    video_path,
-                    obs_path,
-                ) = success_child.best_reward.play()
-                v_succ = behavior_captioner.conclude(
-                    image_paths=behavior_image_paths,
-                    state_path=obs_path,
-                    task=self.code,
-                )
+                caption_data = success_child.best_reward.caption()
                 f_succ = int(success_child.best_reward.summary["success"] > 0)
                 num_f_succ.append(f_succ)
+                v_succ = caption_data['gpt-4v-succ']
+                video_path = caption_data['video_path']
                 if v_succ:
                     num_v_succ.append(1)
                 else:
