@@ -56,7 +56,7 @@ if TYPE_CHECKING:
 
 from envs.franka_table import mdp
 
-from ..utils import MyUsdFileCfg
+# from ..utils import MyUsdFileCfg
 
 ##
 # Scene definition
@@ -176,7 +176,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         init_state=RigidObjectCfg.InitialStateCfg(
             pos=[0.5, 0, 0.055], rot=[1, 0, 0, 0]
         ),
-        spawn=MyUsdFileCfg(
+        spawn=UsdFileCfg(
             usd_path=f"{ZEROHERO_ROOT_DIR}/envs/franka_table/assets/plate.usd",
             scale=(
                 0.65,

@@ -82,7 +82,7 @@ class TaskDatabase:
             index_to_pop = indices[0]
             df.loc[index_to_pop, "status"] = "doing"
             task = df.loc[index_to_pop, "command"]
-            df = self.df
+            self.df = df
             self.save()
         else:
             task = None
