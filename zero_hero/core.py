@@ -24,7 +24,7 @@ from .task import TaskDatabase
 
 DUMMY_FAILURE = -10000.0
 ORBIT_ROOT_DIR = os.environ["ORBIT_ROOT_DIR"]
-ZERO_HERO_ROOT_DIR = f"{ORBIT_ROOT_DIR}/source/standalone/zero_hero"
+ZERO_HERO_ROOT_DIR = os.environ["ZEROHERO_ROOT_DIR"]
 ISAAC_ROOT_DIR = f"{ORBIT_ROOT_DIR}/_isaac_sim"
 
 MODULE_INIT = """
