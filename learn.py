@@ -43,7 +43,7 @@ def main(cfg):
         n_samples=cfg.n_success_samples,
         temperature=cfg.temperature,
         model=cfg.model,
-    )
+    ).init()
     bc = BehaviorCaptioner(
         init_sys_prompt=f"{task_node.prompt_dir}/task/behavior_context.txt",
     )

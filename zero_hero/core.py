@@ -24,7 +24,7 @@ from .task import TaskDatabase
 
 DUMMY_FAILURE = -10000.0
 ORBIT_ROOT_DIR = os.environ["ORBIT_ROOT_DIR"]
-ZERO_HERO_ROOT_DIR = ORBIT_ROOT_DIR + "zero_hero"
+ZERO_HERO_ROOT_DIR = f"{ORBIT_ROOT_DIR}/source/standalone/zero_hero"
 ISAAC_ROOT_DIR = f"{ORBIT_ROOT_DIR}/_isaac_sim"
 
 MODULE_INIT = """
@@ -1468,8 +1468,8 @@ class EnvNode(Node):
 
     def render(self):
         for msg in self.messages:
-            print('*'*50 + f'role: {msg["role"]}'+'*'*50)
-            print(msg['content'])
+            print("*" * 50 + f'role: {msg["role"]}' + "*" * 50)
+            print(msg["content"])
         return
 
     def _propose(self, temperature_increase=0) -> List[TaskNode]:
@@ -1484,7 +1484,7 @@ class EnvNode(Node):
             logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
         pattern = r"([Tt]ask\s+\d+:.*)"
         msg = responses[0]["message"]
-        tasks = re.findall(pattern, msg['content'])
+        tasks = re.findall(pattern, msg["content"])
         codes = None
         if len(tasks) > 0:
             codes = [
