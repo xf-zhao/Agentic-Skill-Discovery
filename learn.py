@@ -21,13 +21,19 @@ def main(cfg):
     logging.info(f"Workspace: {workspace_dir}")
     openai.api_key = os.getenv("OPENAI_API_KEY")
     logging.info(cfg)
-    my_cfg = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     env_name = cfg.env.env_name.lower()
+    env_idx = f"E{cfg.seed:02d}"
     tdb = TaskDatabase(
-        store_path=f'{ZEROHERO_ROOT_DIR}/envs_gpt/tasks/{env_name.replace(" ","_")}.csv'
+        store_path=f'{ZEROHERO_ROOT_DIR}/envs_gpt/tasks/{env_name.replace(" ","_")}_{env_idx}.csv'
     )
+    tdb.render()
     task = tdb.pop()
+    if task is None:
+        logging.info(f"Nothing to do with task database {tdb.store_path}!")
+        tdb.render()
+        return
     cfg.task = task
+    my_cfg = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     wandbrun = wandb.init(
         project=cfg.wandb_project,
         config=my_cfg,
@@ -41,7 +47,7 @@ def main(cfg):
     bc = BehaviorCaptioner(
         init_sys_prompt=f"{task_node.prompt_dir}/task/behavior_context.txt",
     )
-    logging.info(f"Learning skill: {task_node.code}.")
+    logging.info(f"Learning skill: {task}.")
     for task_ite in range(cfg.task_iterations):
         if task_node.num_variants >= cfg.num_variants:
             break
@@ -83,7 +89,6 @@ def main(cfg):
                     "reward_ite": reward_ite,
                 }
             )
-    logging.info("Done!")
 
     if task_node.num_variants > 0:
         task_status = "completed"
@@ -95,7 +100,11 @@ def main(cfg):
         logging.info(f"Mission impossible on {task}.")
     else:
         raise NotImplementedError
+    tdb.load()
     tdb.update_task({"command": task, "status": task_status})
+    tdb.save()
+    logging.info(f"Done! for task: {task}.")
+    tdb.render()
 
 
 if __name__ == "__main__":

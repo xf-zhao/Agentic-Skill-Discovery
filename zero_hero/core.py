@@ -1103,8 +1103,8 @@ class TaskNode(Node):
                 caption_data = success_child.best_reward.caption()
                 f_succ = int(success_child.best_reward.summary["success"] > 0)
                 num_f_succ.append(f_succ)
-                v_succ = caption_data['gpt-4v-succ']
-                video_path = caption_data['video_path']
+                v_succ = caption_data["gpt-4v-succ"]
+                video_path = caption_data["video_path"]
                 if v_succ:
                     num_v_succ.append(1)
                 else:
@@ -1319,34 +1319,14 @@ class EnvNode(Node):
         ]
         return self
 
-    def propose(
-        self, n_samples=1, temperature=0, model="gpt-3.5-turbo"
-    ) -> List[TaskNode]:
-        tasks = None
+    def propose(self):
+        self.init().render()
         for i in range(5):
-            tasks = self._propose(temperature_increase=i * 0.1)
-            if len(tasks) > 0:
+            msg, codes = self._propose(temperature_increase=i * 0.1)
+            if codes is not None and len(codes) > 0:
+                self.messages.extend(msg)
                 break
-        assert tasks is not None
-        for task in tasks:
-            code = (
-                task.split(": ")[-1]
-                .replace("specific", "target")
-                .replace("specified", "target")
-                .replace("target target", "target")
-            )
-            child: TaskNode = TaskNode(
-                root_dir=self.root_dir,
-                code=code,
-                n_samples=n_samples,
-                temperature=temperature,
-                model=model,
-            )
-            self.add_child(child)
-            child.init()
-            # One task each time
-            break
-        return self.children
+        return codes
 
     def save_status(self):
         def get_variant_tree(variant):
@@ -1486,8 +1466,13 @@ class EnvNode(Node):
         }
         return stat
 
+    def render(self):
+        for msg in self.messages:
+            print('*'*50 + f'role: {msg["role"]}'+'*'*50)
+            print(msg['content'])
+        return
+
     def _propose(self, temperature_increase=0) -> List[TaskNode]:
-        self.init()
         messages = self.messages
         responses = gpt_call(
             messages=messages,
@@ -1498,9 +1483,20 @@ class EnvNode(Node):
         if self.n_samples == 1:
             logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
         pattern = r"([Tt]ask\s+\d+:.*)"
-        content = responses[0]["message"]["content"]
-        tasks = re.findall(pattern, content)
-        return tasks
+        msg = responses[0]["message"]
+        tasks = re.findall(pattern, msg['content'])
+        codes = None
+        if len(tasks) > 0:
+            codes = [
+                (
+                    task.split(": ")[-1]
+                    .replace("specific", "target")
+                    .replace("specified", "target")
+                    .replace("target target", "target")
+                )
+                for task in tasks
+            ]
+        return msg, codes
 
     def _update_self_with_node(self, node):
         super()._update_self_with_node(node)
