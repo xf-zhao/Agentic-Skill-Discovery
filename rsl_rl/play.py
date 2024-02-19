@@ -10,6 +10,7 @@ from __future__ import annotations
 """Launch Isaac Sim Simulator first."""
 
 
+import sys
 from tqdm import tqdm
 import argparse
 import os
@@ -58,6 +59,9 @@ parser.add_argument(
     help="Total steps.",
 )
 
+
+dirname = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, dirname)
 from eurekaplus.utils.misc import set_freest_gpu
 
 set_freest_gpu()
@@ -98,10 +102,6 @@ from omni.isaac.orbit_tasks.utils.wrappers.rsl_rl import (
     export_policy_as_onnx,
 )
 
-import sys
-
-dirname = os.path.dirname(os.path.dirname(__file__))
-sys.path.insert(0, dirname)
 
 import envs, envs_gpt  # noqa: F401
 

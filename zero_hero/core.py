@@ -672,7 +672,7 @@ class RewardNode(Node):
         video_path = f"{video_dir}/rl-video-step-0.mp4"
         obs_path = f"{video_dir}/rl-video-step-0-obs.json"
         if not os.path.exists(video_path):
-            return None, None
+            return None
         image_paths = video_to_frames(video_path)
         playbacks = {
             "reward_idx": self.idx,
