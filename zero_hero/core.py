@@ -440,6 +440,7 @@ class RewardNode(Node):
         self.reward_ite = reward_ite
         self.video = video
         self.runable = True
+        self.success_idx = None
         self.num_envs = num_envs
         self.rl_run = None
         self.play_run = None
@@ -476,6 +477,7 @@ class RewardNode(Node):
         super().init()
         cur_env_dir = f"{self.root_dir}/envs_gpt/{self.env_name}/{self.idx}"
         self.rl_filepath = f"{self.idx}-{self.ite}.txt"
+        self.success_idx = self.parent.idx
         self.cur_env_dir = cur_env_dir
         self.log_dir = f"{self.cur_env_dir}/logs"
 
@@ -648,7 +650,7 @@ class RewardNode(Node):
         data = {
             "task": self.task,
             "task_ite": self.task_ite,
-            "success_idx": self.parent.idx,
+            "success_idx": self.success_idx,
             "reward_idx": self.idx,
             "reward_ite": self.reward_ite,
             "num_syntax_error": self.num_syntax_error,
@@ -766,7 +768,7 @@ class RewardNode(Node):
         return summary
 
     def _write_record_line(self, data, record_file):
-        line = pd.DataFrame(data).to_csv(index=False, header=False)
+        line = pd.DataFrame([data]).to_csv(index=False, header=False)
         with open(record_file, "w+") as frecord:
             frecord.write(line)
         return
@@ -821,7 +823,7 @@ class SuccessNode(Node):
         )
         initial_user = self.initial_user.format(
             task_obs_code_string=self.env_obs_code,
-            task_description=self.task.code,
+            task_description=self.task,
         )
         self.messages = [
             self._wrap_system_message(initial_system),
@@ -838,6 +840,7 @@ class SuccessNode(Node):
         memory_requirement=10,
         task_ite=1,
         reward_ite=1,
+        behavior_captioner=None,
     ) -> List[RewardNode]:
         self.children: List[RewardNode] = []
         responses = gpt_call(
@@ -882,6 +885,7 @@ class SuccessNode(Node):
                 memory_requirement=memory_requirement,
                 task_ite=task_ite,
                 reward_ite=reward_ite,
+                behavior_captioner=behavior_captioner,
             )
             self.add_child(child)
             child.init()
@@ -964,7 +968,7 @@ class SuccessNode(Node):
         stats = self.stats
         # Plot the success rate
         fig, axs = plt.subplots(2, figsize=(6, 6))
-        fig.suptitle(f"{self.task.code}")
+        fig.suptitle(f"{self.task}")
 
         max_successes = stats["max_success"]
         execute_rates = stats["execute_rate"]
@@ -1076,7 +1080,7 @@ class TaskNode(Node):
                 continue
             child: SuccessNode = SuccessNode(
                 root_dir=self.root_dir,
-                task=self,
+                task=self.code,
                 messages=messages,
                 response=response,
                 code=code,
@@ -1089,7 +1093,7 @@ class TaskNode(Node):
             child.init()
         return self.children
 
-    def collect(self, behavior_captioner: BehaviorCaptioner = None):
+    def collect(self):
         children_bak = self.children.copy()
         self.children = []
         num_optimized = []

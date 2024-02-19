@@ -67,6 +67,7 @@ def main(cfg):
                     max_iterations=cfg.max_iterations,
                     task_ite=task_ite,
                     reward_ite=reward_ite,
+                    behavior_captioner=bc,
                 )
                 for node in reward_nodes:
                     node.run()
@@ -79,9 +80,7 @@ def main(cfg):
                         "task_ite": task_ite,
                     }
                 )
-            task_stat = task_node.collect(
-                behavior_captioner=bc
-            )  # check behavior caption
+            task_stat = task_node.collect()
             wandbrun.log(
                 {
                     **task_stat,
