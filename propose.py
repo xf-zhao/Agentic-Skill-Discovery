@@ -18,7 +18,8 @@ def main(cfg):
     env_name = cfg.env.env_name.lower()
     env_idx = f"E{cfg.seed:02d}"
     tdb = TaskDatabase(
-        store_path=f'{ZEROHERO_ROOT_DIR}/envs_gpt/tasks/{env_name.replace(" ","_")}_{env_idx}.csv'
+        store_path=f'{ZEROHERO_ROOT_DIR}/envs_gpt/tasks/{env_name.replace(" ","_")}_{env_idx}.csv',
+
     )
     env_node = EnvNode(
         task_database=tdb,
@@ -32,11 +33,13 @@ def main(cfg):
         skills=[],
         impossibles=[],
     )
-    tasks = env_node.propose()
-    tdb.add_tasks(tasks)
-    tdb.render()
-    tdb.save()
-    logging.info(f"Updated task database {tdb.store_path} with {len(tasks)} new tasks.")
+    while not tdb.met_target():
+        tasks = env_node.propose()
+        tdb.add_tasks(tasks)
+        tdb.render()
+        tdb.save()
+        logging.info(f"Updated task database {tdb.store_path} with {len(tasks)} new tasks.")
+    logging.info(f'Finished!')
 
 
 if __name__ == "__main__":

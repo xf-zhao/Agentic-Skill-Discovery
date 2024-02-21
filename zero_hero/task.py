@@ -4,9 +4,22 @@ import pandas as pd
 
 
 class TaskDatabase:
-    def __init__(self, store_path="tasks.csv") -> None:
+    def __init__(
+        self, store_path="tasks.csv", target_num_skills=64, failed_tolerance=None
+    ) -> None:
         self.store_path = store_path
+        self.target_num_skills = target_num_skills
+        self.failed_tolerance = (
+            failed_tolerance if failed_tolerance is not None else target_num_skills
+        )
         self.load()
+
+    def met_target(self):
+        is_met = (
+            self.num_skills >= self.target_num_skills
+            or self.num_failed >= self.failed_tolerance
+        )
+        return is_met
 
     def load(self):
         store_path = self.store_path
@@ -27,8 +40,13 @@ class TaskDatabase:
     def status(self):
         return self.df["status"]
 
+    @property
     def num_skills(self):
         return self.df["status"] == "complete"
+
+    @property
+    def num_failed(self):
+        return self.df["status"] == "failed"
 
     def add_task(self, task: dict):
         df = self.df

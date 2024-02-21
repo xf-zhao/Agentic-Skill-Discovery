@@ -604,9 +604,7 @@ class RewardNode(Node):
         if self.playbacks is None:
             self.playbacks = self.play()
         description, v_succ = self.behavior_captioner.conclude(
-            image_paths=self.playbacks["image_paths"],
-            state_path=self.playbacks["state_path"],
-            task=self.task,
+            playbacks=self.playbacks, task=self.task
         )
         data = {
             **self.playbacks,
