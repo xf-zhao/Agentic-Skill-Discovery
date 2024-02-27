@@ -48,10 +48,11 @@ class BehaviorCaptioner:
         self.save = save
         self.caption_output = caption_output
 
-    def describe(self, playbacks:dict, task: str = ""):
-        obs_data = read_obs(playbacks['state'])
+    def describe(self, playbacks: dict, task: str = ""):
+        obs_data = read_obs(playbacks["state_path"])
         image_contents = [
-            self.make_image_content(image_path) for image_path in playbacks['image']
+            self.make_image_content(image_path)
+            for image_path in playbacks["image_paths"]
         ]
         for attempt in range(10):
             try:
@@ -83,22 +84,21 @@ class BehaviorCaptioner:
         msg = response.choices[0]
         description = msg["message"]["content"]
         if self.save:
-            with open(f"{playbacks['dir']}/{self.caption_output}", "w") as fcap:
+            with open(f"{playbacks['video_dir']}/{self.caption_output}", "w") as fcap:
                 fcap.write(description)
         return description
 
-    def conclude(self, playbacks:dict, task: str = ""):
-        if playbacks['image'] is None:
+    def conclude(self, playbacks: dict, task: str = ""):
+        if playbacks["image_paths"] is None:
             logging.warning(f"No behavior images to describe.")
             return
-        description = self.describe( playbacks , task=task
-        )
+        description = self.describe(playbacks, task=task)
         if "SUCCESS" in description:
             succ = True
         elif "FAIL" in description:
             succ = False
         else:
-            succ = None # future work
+            succ = None  # future work
         return description, succ
 
     def make_image_content(self, image_path):
