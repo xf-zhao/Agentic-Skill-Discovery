@@ -5,13 +5,18 @@ import pandas as pd
 
 class TaskDatabase:
     def __init__(
-        self, store_path="tasks.csv", target_num_skills=64, failed_tolerance=None
+        self,
+        store_path="tasks.csv",
+        target_num_skills=64,
+        failed_tolerance=None,
+        proposal_batch=10,
     ) -> None:
         self.store_path = store_path
         self.target_num_skills = target_num_skills
         self.failed_tolerance = (
-            failed_tolerance if failed_tolerance is not None else target_num_skills
+            failed_tolerance if failed_tolerance is not None else target_num_skills * 2
         )
+        self.proposal_batch = proposal_batch
         self.load()
 
     def met_target(self):
@@ -20,6 +25,9 @@ class TaskDatabase:
             or self.num_failed >= self.failed_tolerance
         )
         return is_met
+
+    def should_wait(self):
+        return self.num_wait >= self.proposal_batch
 
     def load(self):
         store_path = self.store_path
@@ -41,12 +49,18 @@ class TaskDatabase:
         return self.df["status"]
 
     @property
+    def num_wait(self):
+        return (self.df["status"] == "todo").sum() + (
+            self.df["status"] == "doing"
+        ).sum()
+
+    @property
     def num_skills(self):
-        return self.df["status"] == "complete"
+        return (self.df["status"] == "completed").sum()
 
     @property
     def num_failed(self):
-        return self.df["status"] == "failed"
+        return (self.df["status"] == "failed").sum()
 
     def add_task(self, task: dict):
         df = self.df
