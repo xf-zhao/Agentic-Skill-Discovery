@@ -91,8 +91,14 @@ def main(cfg):
 
     if task_node.num_variants > 0:
         task_status = "completed"
+        rids = []
+        want_key = "variants_video_"
+        for k in task_stat:
+            if k.startswith(want_key):
+                rid = k.split(want_key)[-1]
+                rids.append(rid)
         logging.info(
-            f"Collected new skill {task} with {task_node.num_variants} variants."
+            f"Collected new skill {task} with {task_node.num_variants} variants: {rids}."
         )
     elif task_node.num_variants == 0:
         task_status = "failed"
@@ -100,7 +106,7 @@ def main(cfg):
     else:
         raise NotImplementedError
     tdb.load()
-    tdb.update_task({"command": task, "status": task_status})
+    tdb.update_task({"command": task, "status": task_status, "variants": rids[0]})
     tdb.save()
     logging.info(f"Done! for task: {task}.")
     tdb.render()

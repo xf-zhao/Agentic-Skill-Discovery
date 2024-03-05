@@ -31,7 +31,7 @@ class TaskDatabase:
 
     def load(self):
         store_path = self.store_path
-        columns = ["command", "status"]
+        columns = ["command", "status", 'variants']
         if os.path.exists(store_path):
             df = pd.read_csv(store_path)
         else:
@@ -49,6 +49,10 @@ class TaskDatabase:
         return self.df["status"]
 
     @property
+    def variants(self):
+        return self.df["variants"]
+
+    @property
     def num_wait(self):
         return (self.df["status"] == "todo").sum() + (
             self.df["status"] == "doing"
@@ -64,7 +68,7 @@ class TaskDatabase:
 
     def add_task(self, task: dict):
         df = self.df
-        row = pd.Series({"command": task, "status": "todo"})
+        row = pd.Series({"command": task, "status": "todo", 'variants':''})
         df = pd.concat([df, pd.DataFrame([row], columns=row.index)]).reset_index(
             drop=True
         )
@@ -79,6 +83,7 @@ class TaskDatabase:
     def update_task(self, task: dict):
         df = self.df
         df.loc[df.command == task["command"], "status"] = task["status"]
+        df.loc[df.command == task["command"], "variants"] = task["variants"]
         self.df = df
         self.save()
         return
@@ -90,7 +95,7 @@ class TaskDatabase:
         df = self.df
         numbered_tasks = "\n".join(
             [
-                f"({i+1}) Task: {row.command.rstrip('.')}. Status: {row.status}"
+                f"({i+1}) Task: {row.command.rstrip('.')}. Status: {row.status}. Variants: {row.variants}"
                 for i, row in df.iterrows()
             ]
         )
@@ -119,3 +124,9 @@ class TaskDatabase:
         else:
             task = None
         return task
+
+    @property
+    def skills(self):
+        df = self.df
+        skill_df = df[df["status"] == "completed"]
+        return skill_df
