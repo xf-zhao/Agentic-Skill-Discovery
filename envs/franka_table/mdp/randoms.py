@@ -19,6 +19,8 @@ def reset_root_state_group_uniform(
     asset_cfgs: tuple[SceneEntityCfg,] = (SceneEntityCfg("object"),),
     min_distance=0.1,
 ):
+    if hasattr(env, 'no_random'):
+        return
     asset: RigidObject | Articulation = env.scene[asset_cfgs[0].name]
     root_states = asset.data.default_root_state[env_ids].clone()
     offsets = _compute_root_state_uniform(

@@ -43,15 +43,17 @@ parser.add_argument(
     "--num_envs", type=int, default=None, help="Number of environments to simulate."
 )
 parser.add_argument(
-    "--max_iterations", type=int, default=200, help="Number of RL iterations."
+    "--max_iterations", type=int, default=1500, help="Number of RL iterations."
 )
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
-parser.add_argument("--log_dir", type=str, default=None, help="Log dir to store weights, videos.")
+parser.add_argument(
+    "--log_dir", type=str, default=None, help="Log dir to store weights, videos."
+)
 parser.add_argument(
     "--seed", type=int, default=None, help="Seed used for the environment"
 )
 parser.add_argument(
-    "--precedents", nargs='+', default=None, help="Executing precedent skills."
+    "--precedents", nargs="+", default=None, help="Executing precedent skills."
 )
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -106,6 +108,33 @@ torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
 
 
+def set_current_status_as_default(env):
+    # rigid bodies
+    for rigid_object in env.env.scene.rigid_objects.values():
+        # obtain default and deal with the offset for env origins
+        default_root_state = rigid_object._data.root_state_w.clone()
+        default_root_state[:, 0:3] -= env.env.scene.env_origins
+        # set into the physics simulation
+        rigid_object._data.default_root_state = default_root_state
+    # articulations
+    for articulation_asset in env.env.scene.articulations.values():
+        # obtain default and deal with the offset for env origins
+        default_root_state = articulation_asset._data.root_state_w.clone()
+        default_root_state[:, 0:3] -= env.env.scene.env_origins
+        # obtain default joint positions
+        default_joint_pos = articulation_asset._data.joint_pos.clone()
+        default_joint_vel = articulation_asset._data.joint_vel.clone()
+        articulation_asset._data.default_root_state = default_root_state
+        articulation_asset._data.default_joint_pos = default_joint_pos
+        articulation_asset._data.default_joint_vel = default_joint_vel
+    env.env.episode_length_buf = torch.zeros(
+        env.env.num_envs, device=env.env.device, dtype=torch.long
+    )
+    env.env.no_random = True
+    env.env.env.no_random = True
+    return
+
+
 def main():
     """Train with RSL-RL agent."""
     # parse configuration
@@ -128,7 +157,7 @@ def main():
         if agent_cfg.run_name:
             log_dir += f"_{agent_cfg.run_name}"
         log_dir = os.path.join(log_root_path, log_dir)
-    print(f'Log Directory: {log_dir}')
+    print(f"Log Directory: {log_dir}")
 
     # create isaac environment
     env = gym.make(
@@ -176,10 +205,18 @@ def main():
     precedents = args_cli.precedents
     if precedents is not None:
         pre_runner = OnPolicyRunner(
-        env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device,
+            env,
+            agent_cfg.to_dict(),
+            log_dir=log_dir,
+            device=agent_cfg.device,
         )
-        for ith, precedent_resume in enumerate(precedents):
-            print(f"[INFO]: Loading model checkpoint from: {precedent_resume} for the {ith}-th precedent skill policy.")
+        for ith, precedent in enumerate(precedents):
+            precedent_resume = get_checkpoint_path(
+                precedent, agent_cfg.load_run, agent_cfg.load_checkpoint
+            )
+            print(
+                f"[INFO]: Loading model checkpoint from: {precedent_resume} for the {ith}-th precedent skill policy."
+            )
             pre_runner.load(precedent_resume)
 
             # obtain the trained policy for inference
@@ -194,25 +231,7 @@ def main():
                     actions = policy(obs)
                     # env stepping
                     obs, *_ = env.step(actions)
-        
-        # rigid bodies
-        for rigid_object in env.env.scene.rigid_objects.values():
-            # obtain default and deal with the offset for env origins
-            default_root_state = rigid_object.data.root_state_w.clone()
-            # set into the physics simulation
-            rigid_object.data.default_root_state = default_root_state
-        # articulations
-        for articulation_asset in env.scene.articulations.values():
-            # obtain default and deal with the offset for env origins
-            default_root_state = articulation_asset.data.default_root_state[env_ids].clone()
-            default_root_state[:, 0:3] += env.scene.env_origins[env_ids]
-            # set into the physics simulation
-            articulation_asset.write_root_state_to_sim(default_root_state, env_ids=env_ids)
-            # obtain default joint positions
-            default_joint_pos = articulation_asset.data.default_joint_pos[env_ids].clone()
-            default_joint_vel = articulation_asset.data.default_joint_vel[env_ids].clone()
-            # set into the physics simulation
-            articulation_asset.write_joint_state_to_sim(default_joint_pos, default_joint_vel, env_ids=env_ids)
+            set_current_status_as_default(env)
 
     # run training
     runner.learn(
