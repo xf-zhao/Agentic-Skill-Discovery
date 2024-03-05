@@ -518,25 +518,25 @@ class RewardNode(Node):
 
     def _prepare_launch(self):
         # Only run when memory is enough
-        max_waiting = 60 * 60 * 4 // 10
-        for i in range(
-            max_waiting
-        ):  # Maximum 4 hour waiting time, long enough for finishing one run
+        # Maximum 24 hour waiting time, long enough for finishing one run
+        max_waiting = 60 * 60 * 24 // 10
+        for i in range(max_waiting):
             available_mem = psutil.virtual_memory().available / 1024 / 1024 / 1024
-            if (
+            is_enough = (
                 available_mem > self.memory_requirement
-            ):  # 16 GB is the minimum mem for a new instance
+            )  # 16 GB is the minimum mem for a new instance
+            # Find the freest GPU to run GPU-accelerated RL
+            is_valid = set_freest_gpu()
+            if is_enough and is_valid:
                 break
             else:
                 if i % 60 == 0:
                     logging.info(
-                        f"Available mem: {available_mem}. (Require {self.memory_requirement}). Waiting for enough mem to run node {self.idx}. Time elapsed: {i//6} minutes."
+                        f"Available mem: {available_mem}. (Require {self.memory_requirement}). May also wait for gpu mem. Waiting for enough mem to run node {self.idx}. Time elapsed: {i//6} minutes."
                     )
                 time.sleep(10)
         assert i < max_waiting - 1
 
-        # Find the freest GPU to run GPU-accelerated RL
-        set_freest_gpu()
         return
 
     def run(self):
