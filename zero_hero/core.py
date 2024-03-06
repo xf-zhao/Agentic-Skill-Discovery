@@ -107,6 +107,22 @@ class RewardsCfg:
 """
 
 
+def _wrap_message(self, content, role="user"):
+    return {"role": role, "content": content}
+
+
+def wrap_system_message(self, content):
+    return _wrap_message(content=content, role="system")
+
+
+def wrap_user_message(self, content):
+    return _wrap_message(content=content, role="user")
+
+
+def wrap_assistant_message(self, content):
+    return _wrap_message(content=content, role="assistant")
+
+
 def gpt_call(
     messages,
     model="gpt-3.5-turbo",
