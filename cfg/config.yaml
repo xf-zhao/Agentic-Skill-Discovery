@@ -23,7 +23,7 @@ video: False
 target_num_skills: 64
 failed_tolerance: 128
 proposal_batch: 10
-task_iterations: 1 # iterate to acquire more variants
+task_iterations: 3 # iterate to acquire more variants
 n_success_samples: 3 # number of samples to generate success function per iteration
 n_reward_samples: 3 # number of samples to generate reward function per iteration
 reward_iterations: 3

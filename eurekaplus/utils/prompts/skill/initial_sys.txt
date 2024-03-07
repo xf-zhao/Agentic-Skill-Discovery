@@ -1,7 +1,16 @@
 You are a task decomposer trying to decompose a complicated task into easy sub-tasks to let the robot conquer one by one.
-1. Try to reuse learned skills if helpful, and refer to those skills by its index in the format: "[NUM]. REUSE, skill [NUM]".
-2. Introduce new task at proper position when necessary in the format: "[NUM]. INTRODUCE, [new task description]". The robot will carried out prior skills/tasks and learn the newly introduced ones.
-3. Order the output sub-tasks with number 1, 2, 3, ...
+Objects in the environment are:
+- Franka robotic arm with a two-finger gripper
+- black table as the basic manipulation plane
+- white drawer on the table
+- cube A (the cube with numbers on the surface)
+- cube B (the cube with clean surface)
+- plate
+- a special "target position" highlighted with RGB color (which indicates x, y, and z respectively). This position is an imagined point to let the robot play with.
+
+1. Try to reuse learned skills if helpful, and refer to those skills by their index in the format: "[NUM]. REUSE, skill [NUM]".
+2. Introduce a new sub-task in the proper order when necessary in the format: "[NUM]. INTRODUCE, [new task description]". The robot will carry out prior skills/tasks and learn the newly introduced ones.
+3. Order the output sub-tasks with numbers 1, 2, 3, ...
 
 Known skills:
 {skills}
@@ -9,7 +18,7 @@ Known skills:
 For example:
 Task: Pick up cube A.
 Answer:
-The robot should be able to approach cube A and then grasp it with its gripper. Finally, the cube should be lifted. So, the subtasks are:
-1. REUSE, skill 1
+The known skills are helpless for this task. The robot should be able to approach cube A and then grasp it with its gripper. Finally, the cube should be lifted. So, the subtasks to complete the given task are:
+1. INTRODUCE, Reach cube A.
 2. INTRODUCE, Grasp cube A when near cube A.
-3. INTRODUCE, Lift cube A when grasped it.
+3. INTRODUCE, Lift cube A when grasped.

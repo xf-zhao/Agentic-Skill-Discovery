@@ -107,19 +107,19 @@ class RewardsCfg:
 """
 
 
-def _wrap_message(self, content, role="user"):
+def _wrap_message(content, role="user"):
     return {"role": role, "content": content}
 
 
-def wrap_system_message(self, content):
+def wrap_system_message(content):
     return _wrap_message(content=content, role="system")
 
 
-def wrap_user_message(self, content):
+def wrap_user_message(content):
     return _wrap_message(content=content, role="user")
 
 
-def wrap_assistant_message(self, content):
+def wrap_assistant_message(content):
     return _wrap_message(content=content, role="assistant")
 
 
