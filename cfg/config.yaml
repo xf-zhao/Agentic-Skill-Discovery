@@ -29,6 +29,7 @@ n_reward_samples: 3 # number of samples to generate reward function per iteratio
 reward_iterations: 3
 num_variants: 1 # break if sufficient
 task: ''
+precedents:
 
 # Weights and Biases
 wandb_project: "Zero-Hero" # wandb project if logging with wandb

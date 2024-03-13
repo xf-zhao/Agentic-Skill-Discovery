@@ -444,6 +444,7 @@ class RewardNode(Node):
         task_ite=1,
         reward_ite=1,
         behavior_captioner: BehaviorCaptioner = None,
+        precedents=None,
         *args,
         **kwargs,
     ) -> None:
@@ -462,6 +463,7 @@ class RewardNode(Node):
         self.play_run = None
         self.rl_filepath = None
         self.play_filepath = None
+        self.precedents = precedents
         self.memory_requirement = memory_requirement
         self.policy_feedback = file_to_string(
             f"{self.prompt_dir}/reward/policy_feedback.txt"
@@ -493,6 +495,8 @@ class RewardNode(Node):
         super().init()
         cur_env_dir = f"{self.root_dir}/envs_gpt/{self.env_name}/{self.idx}"
         self.rl_filepath = f"{self.idx}-{self.ite}.txt"
+        if self.precedents is None:
+            self.precedents = self.parent.parent.precedents
         self.success_idx = self.parent.idx
         self.cur_env_dir = cur_env_dir
         self.log_dir = f"{self.cur_env_dir}/logs"
@@ -578,6 +582,10 @@ class RewardNode(Node):
             rl_run_command.append("--video")
             if self.headless:
                 rl_run_command.append("--offscreen_render")
+        if self.precedents is not None and len(self.precedents) >0:
+            rl_run_command.append("--precedents")
+            for precedent in self.precedents:
+                rl_run_command.append(precedent)
         print(f"Executing commands: {rl_run_command}")
         with open(self.rl_filepath, "w") as f:
             self.rl_run = subprocess.Popen(
@@ -1011,10 +1019,11 @@ class SuccessNode(Node):
 
 class TaskNode(Node):
     def __init__(
-        self, variants=None, status_output=None, candidates=None, *args, **kwargs
+        self, variants=None, status_output=None, candidates=None, precedents=None,*args, **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Task"
+        self.precedents = precedents
         self.initial_system = file_to_string(
             f"{self.prompt_dir}/success/initial_system.txt"
         )

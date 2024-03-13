@@ -22,15 +22,19 @@ def main(cfg):
     openai.api_key = os.getenv("OPENAI_API_KEY")
     logging.info(cfg)
     env_name = cfg.env.env_name.lower()
-    env_idx = f"E{cfg.seed:02d}"
+    task = cfg.task
+    specified_task = task is None or task == ""
+    seed = 99 if specified_task else cfg.seed
+    env_idx = f"E{seed:02d}"
     tdb = TaskDatabase(
         store_path=f'{ZEROHERO_ROOT_DIR}/envs_gpt/tasks/{env_name.replace(" ","_")}_{env_idx}.csv'
     )
+    if specified_task:
+        tdb.add_task(task)
     tdb.render()
     task = tdb.pop()
-    if task is None:
+    if task is None or task == "":
         logging.info(f"Nothing to do with task database {tdb.store_path}!")
-        tdb.render()
         return
     cfg.task = task
     my_cfg = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
@@ -43,6 +47,7 @@ def main(cfg):
         n_samples=cfg.n_success_samples,
         temperature=cfg.temperature,
         model=cfg.model,
+        precedents=cfg.precedents,
     ).init()
     bc = BehaviorCaptioner(
         init_sys_prompt=f"{task_node.prompt_dir}/task/behavior_context.txt",
@@ -108,8 +113,8 @@ def main(cfg):
     tdb.load()
     tdb.update_task({"command": task, "status": task_status, "variants": rids[0]})
     tdb.save()
-    logging.info(f"Done! for task: {task}.")
     tdb.render()
+    logging.info(f"Done! for task: {task}.")
 
 
 if __name__ == "__main__":

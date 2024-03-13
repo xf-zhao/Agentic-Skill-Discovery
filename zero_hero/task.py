@@ -3,7 +3,18 @@ import os
 import pandas as pd
 
 
-class TaskDatabase:
+class Database:
+    def get_attr(self, attr, index=None, task=None):
+        if index is not None:
+            variants = self.df.loc[index][attr]
+        elif task is not None:
+            variants = self.df[self.df["command"] == task][attr]
+        else:
+            raise NotImplementedError
+        return variants
+
+
+class TaskDatabase(Database):
     def __init__(
         self,
         store_path="tasks.csv",
@@ -31,7 +42,7 @@ class TaskDatabase:
 
     def load(self):
         store_path = self.store_path
-        columns = ["command", "status", 'variants']
+        columns = ["command", "status", "variants"]
         if os.path.exists(store_path):
             df = pd.read_csv(store_path)
         else:
@@ -68,7 +79,7 @@ class TaskDatabase:
 
     def add_task(self, task: dict):
         df = self.df
-        row = pd.Series({"command": task, "status": "todo", 'variants':''})
+        row = pd.Series({"command": task, "status": "todo", "variants": ""})
         df = pd.concat([df, pd.DataFrame([row], columns=row.index)]).reset_index(
             drop=True
         )
