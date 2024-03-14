@@ -23,7 +23,7 @@ def main(cfg):
     logging.info(cfg)
     env_name = cfg.env.env_name.lower()
     task = cfg.task
-    specified_task = task is None or task == ""
+    specified_task = task is not None and len(task) >0
     seed = 99 if specified_task else cfg.seed
     env_idx = f"E{seed:02d}"
     tdb = TaskDatabase(
