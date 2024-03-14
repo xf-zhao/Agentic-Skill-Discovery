@@ -77,13 +77,16 @@ class TaskDatabase(Database):
     def num_failed(self):
         return (self.df["status"] == "failed").sum()
 
-    def add_task(self, task: dict):
+    def add_task(self, task: str):
         df = self.df
-        row = pd.Series({"command": task, "status": "todo", "variants": ""})
-        df = pd.concat([df, pd.DataFrame([row], columns=row.index)]).reset_index(
-            drop=True
-        )
-        self.df = df
+        if task in self.df["command"]:
+            self.refresh_task(task)
+        else:
+            row = pd.Series({"command": task, "status": "todo", "variants": ""})
+            df = pd.concat([df, pd.DataFrame([row], columns=row.index)]).reset_index(
+                drop=True
+            )
+            self.df = df
         return
 
     def add_tasks(self, tasks):
@@ -97,6 +100,10 @@ class TaskDatabase(Database):
         df.loc[df.command == task["command"], "variants"] = task["variants"]
         self.df = df
         self.save()
+        return
+
+    def refresh_task(self, task: str):
+        self.update_task({"command": task, "status": "todo", "variants": ""})
         return
 
     def save(self):

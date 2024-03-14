@@ -200,9 +200,9 @@ def extract_code_string(response, combine_all=False, log=False):
         else:
             code_string = None
     if log:
-        print('='*100)
+        print("=" * 100)
         print(code_string)
-        print('='*100)
+        print("=" * 100)
     return code_string
 
 
@@ -582,20 +582,11 @@ class RewardNode(Node):
             "--log_dir",
             self.log_dir,
         ]
-        if self.headless:
-            rl_run_command.append("--headless")
         if self.video:
             rl_run_command.append("--video")
             if self.headless:
                 rl_run_command.append("--offscreen_render")
-        if self.precedents is not None and len(self.precedents) > 0:
-            rl_run_command.append("--precedents")
-            for precedent in self.precedents:
-                if not precedent.startswith('/'):
-                    precedent = f'{ZERO_HERO_ROOT_DIR}/envs_gpt/{self.env_name}/{precedent}'
-                rl_run_command.append(precedent)
-
-        print(f"Executing commands: {rl_run_command}")
+        rl_run_command = self._fill_command(rl_run_command)
         with open(self.rl_filepath, "w") as f:
             self.rl_run = subprocess.Popen(
                 rl_run_command,
@@ -622,10 +613,9 @@ class RewardNode(Node):
             os.path.dirname(self.log_dir),
         ]
         if self.headless:
-            play_run_command.append("--headless")
             play_run_command.append("--offscreen_render")
+        play_run_command = self._fill_command(play_run_command)
         self.play_filepath = self.rl_filepath.rstrip(".txt") + "_play.txt"
-        print(f"Executing commands: {play_run_command}")
         with open(self.play_filepath, "w") as f:
             self.play_run = subprocess.Popen(play_run_command, stdout=f, stderr=f)
         playbacks = self._block_until_play_recorded()
@@ -653,6 +643,20 @@ class RewardNode(Node):
         summary = self._summarize_runlog()
         self.summary = summary
         return self
+
+    def _fill_command(self, run_command):
+        if self.headless:
+            run_command.append("--headless")
+        if self.precedents is not None and len(self.precedents) > 0:
+            run_command.append("--precedents")
+            for precedent in self.precedents:
+                if not precedent.startswith("/"):
+                    precedent = (
+                        f"{ZERO_HERO_ROOT_DIR}/envs_gpt/{self.env_name}/{precedent}"
+                    )
+                run_command.append(precedent)
+        print(f"Executing commands: {run_command}")
+        return run_command
 
     def _block_until_training(self):
         # Ensure that the RL training has started before moving on

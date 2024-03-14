@@ -58,6 +58,9 @@ parser.add_argument(
     default=250,
     help="Total steps.",
 )
+parser.add_argument(
+    "--precedents", nargs="+", default=None, help="Executing precedent skills."
+)
 
 
 dirname = os.path.dirname(os.path.dirname(__file__))
@@ -104,6 +107,7 @@ from omni.isaac.orbit_tasks.utils.wrappers.rsl_rl import (
 
 
 import envs, envs_gpt  # noqa: F401
+import myutils
 
 
 def main():
@@ -178,6 +182,11 @@ def main():
     print("[INFO]: reset env. Start simulating next step.")
     # simulate environment
     # while simulation_app.is_running():
+
+    myutils.set_with_precedents(
+        env, agent_cfg=agent_cfg, log_dir=log_dir, precedents=args_cli.precedents
+    )
+
     for i in tqdm(range(env.max_episode_length)):
         # run everything in inference mode
         with torch.inference_mode():
