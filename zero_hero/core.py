@@ -591,7 +591,10 @@ class RewardNode(Node):
         if self.precedents is not None and len(self.precedents) > 0:
             rl_run_command.append("--precedents")
             for precedent in self.precedents:
+                if not precedent.startswith('/'):
+                    precedent = f'{ZERO_HERO_ROOT_DIR}/envs_gpt/{self.env_name}/{precedent}'
                 rl_run_command.append(precedent)
+
         print(f"Executing commands: {rl_run_command}")
         with open(self.rl_filepath, "w") as f:
             self.rl_run = subprocess.Popen(
