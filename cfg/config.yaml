@@ -15,7 +15,7 @@ model: gpt-3.5-turbo-0125  # LLM model (other options are gpt-4, gpt-4-0613, gpt
 seed: 0
 temperature: 1
 debug: False
-headless: True
+headless: False
 max_iterations: 1500 # RL Policy training iterations (decrease this to make the feedback loop faster)
 num_envs: 2048
 memory_requirement: 16
@@ -32,7 +32,7 @@ num_variants: 1 # break if sufficient
 task: ''
 mission: "Pick up Cube A with the gripper."
 precedents: null
-# precedents: "R8486375,R8486375"
+# precedents: "R8486375e,R8486375e"
 
 # Weights and Biases
 wandb_project: "Zero-Hero" # wandb project if logging with wandb
