@@ -176,7 +176,7 @@ def gpt_call(
     return responses
 
 
-def extract_code_string(response, combine_all=False):
+def extract_code_string(response, combine_all=False, log=False):
     patterns = [
         r"```python(.*?)```",
         r"```(.*?)```",
@@ -194,12 +194,15 @@ def extract_code_string(response, combine_all=False):
                 for cs in code_strings:
                     code_string += cs.strip() + "\n"
             else:
-                code_string = code_strings[
-                    -1
-                ].strip()  # assume the last is a combined one.
+                # assume the last is a combined one in this case
+                code_string = code_strings[-1].strip()
             break
         else:
             code_string = None
+    if log:
+        print('='*100)
+        print(code_string)
+        print('='*100)
     return code_string
 
 
@@ -350,7 +353,7 @@ class Node:
                     else:
                         gpt_err = False
                         response = responses[0]
-                code = extract_code_string(response=response)
+                code = extract_code_string(response=response, combine_all=True)
                 no_err, err_feedback = self._syntax_examine(code)
                 if not no_err:
                     messages.extend(
@@ -437,6 +440,7 @@ class RewardNode(Node):
         headless=False,
         video=False,
         memory_requirement=16,
+        min_gpu_mem=16,
         max_iterations=2000,
         priors=None,
         record=None,
@@ -465,6 +469,7 @@ class RewardNode(Node):
         self.play_filepath = None
         self.precedents = precedents
         self.memory_requirement = memory_requirement
+        self.min_gpu_mem = min_gpu_mem
         self.policy_feedback = file_to_string(
             f"{self.prompt_dir}/reward/policy_feedback.txt"
         )
@@ -546,13 +551,14 @@ class RewardNode(Node):
                 available_mem > self.memory_requirement
             )  # 16 GB is the minimum mem for a new instance
             # Find the freest GPU to run GPU-accelerated RL
-            is_valid = set_freest_gpu()
+            gpu_mem_avi = set_freest_gpu()
+            is_valid = gpu_mem_avi >= self.min_gpu_mem
             if is_enough and is_valid:
                 break
             else:
                 if i % 60 == 0:
                     logging.info(
-                        f"Available mem: {available_mem}. (Require {self.memory_requirement}). May also wait for gpu mem. Waiting for enough mem to run node {self.idx}. Time elapsed: {i//6} minutes."
+                        f"Available RAM: {available_mem} (require {self.memory_requirement}); Available GPU mem: {gpu_mem_avi} (require {self.min_gpu_mem}). Waiting for enough resouces to run node {self.idx}. Time elapsed: {i//6} minutes."
                     )
                 time.sleep(10)
         assert i < max_waiting - 1
@@ -582,7 +588,7 @@ class RewardNode(Node):
             rl_run_command.append("--video")
             if self.headless:
                 rl_run_command.append("--offscreen_render")
-        if self.precedents is not None and len(self.precedents) >0:
+        if self.precedents is not None and len(self.precedents) > 0:
             rl_run_command.append("--precedents")
             for precedent in self.precedents:
                 rl_run_command.append(precedent)
@@ -1019,7 +1025,13 @@ class SuccessNode(Node):
 
 class TaskNode(Node):
     def __init__(
-        self, variants=None, status_output=None, candidates=None, precedents=None,*args, **kwargs
+        self,
+        variants=None,
+        status_output=None,
+        candidates=None,
+        precedents=None,
+        *args,
+        **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Task"

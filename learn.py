@@ -42,12 +42,23 @@ def main(cfg):
         project=cfg.wandb_project,
         config=my_cfg,
     )
+    precedents=cfg.precedents
+    if precedents is not None:
+        if isinstance(precedents, str):
+            if len(precedents) > 0:
+                precedents = precedents.split(',')
+            else:
+                precedents = None
+        elif isinstance(precedents, list):
+            pass
+        else:
+            raise NotImplementedError
     task_node = TaskNode(
         code=cfg.task,
         n_samples=cfg.n_success_samples,
         temperature=cfg.temperature,
         model=cfg.model,
-        precedents=cfg.precedents,
+        precedents=precedents,
     ).init()
     bc = BehaviorCaptioner(
         init_sys_prompt=f"{task_node.prompt_dir}/task/behavior_context.txt",

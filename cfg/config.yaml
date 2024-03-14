@@ -17,8 +17,9 @@ temperature: 1
 debug: False
 headless: True
 max_iterations: 1500 # RL Policy training iterations (decrease this to make the feedback loop faster)
-num_envs: 4096
-memory_requirement: 10
+num_envs: 2048
+memory_requirement: 16
+min_gpu_mem: 16
 video: False
 target_num_skills: 64
 failed_tolerance: 128
@@ -29,7 +30,9 @@ n_reward_samples: 3 # number of samples to generate reward function per iteratio
 reward_iterations: 3
 num_variants: 1 # break if sufficient
 task: ''
-precedents:
+mission: "Pick up Cube A with the gripper."
+precedents: null
+# precedents: "R8486375,R8486375"
 
 # Weights and Biases
 wandb_project: "Zero-Hero" # wandb project if logging with wandb

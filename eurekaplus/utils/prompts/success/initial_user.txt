@@ -3,4 +3,4 @@ The Python environment is
 {task_obs_code_string}
 ```
 Write a success deterministic function for the following task: {task_description}.
-But remember, always put all codes together as a whole block at the end, so I can directly copy them at once.
+Remember to explicitly configure `SuccessCfg` so that I can directly copy the code.

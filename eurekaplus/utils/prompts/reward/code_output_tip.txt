@@ -1,5 +1,5 @@
-To incrementally guide a reinforcement learning agent in a curriculums, you should write many sub-reward functions, encoded individually.
-The learning agent will be rewarded by the weighted sum of those sub-reward functions .
+To incrementally guide a reinforcement learning agent in a curriculum, you should write many sub-reward functions, encoded individually.
+The learning agent will be rewarded by the weighted sum of those sub-reward functions.
 
 Some helpful tips for writing the reward function code:
     (1) You may find it helpful to normalize the reward to a fixed range by applying transformations like torch.exp to the reward components
@@ -7,10 +7,10 @@ Some helpful tips for writing the reward function code:
     (3) Make sure the type of each input variable is correctly specified; a float input variable should not be specified as torch.Tensor
     (4) Most importantly, only variables provided by the environment definition can be used (namely, variables of the keys of `env.obs_buf["observations"]` dict). You can only access `env` inside your function definition. Under no circumstance can you introduce new input variables.
     (5) Make sure every function mentioned is well-defined and a proper weight assigned to `func` function.
-    (6) Every sub-reward should be a clearly programmed in a single function, correponding to a specific `RewardsCfg` class, which only accepts `func` function that you defined, while `params` can only, if necessary, contain constant input variable instead of variables from the observation code.
-    (7) The code output should be formatted as a python code string: "```python ... ```" for easy extraction.
-    (8) DO NOT sum sub-rewards by yourself, just provide every sub-reward function. They will be handled inplicitly by the code framework.
-    (9) Each new defined sub-reward function should output a reward tensor of a shape (num_envs, ), call `tensor.squeeze()` to convert to this shape but only when necessary.
+    (6) Every sub-reward should be clearly programmed in a single function, corresponding to a specific `RewardsCfg` class, which only accepts `func` function that you defined, while `params` can only, if necessary, contain constant input variable instead of variables from the observation code.
+    (7) The code output should be formatted as a Python code string: "```python ... ```" for easy extraction.
+    (8) DO NOT sum sub-rewards by yourself, just provide every sub-reward function. They will be handled implicitly by the code framework.
+    (9) Each newly defined sub-reward function should output a reward tensor of a shape (num_envs, ). Call `tensor.squeeze()` to convert to this shape but only when necessary.
     (10) Define your own reward functions first, and follow the signature to include them in `RewardsCfg` as shown.
-    (11) Use env.obs_buf for current RL step observation, and env.prev_obs_buf for the previous step when necessary.
+    (11) Use env.obs_buf for the current RL step observation, and env.prev_obs_buf for the previous step when necessary.
     (12) `RewTerm`, `RLTaskEnv`, and `configclass`, etc, are already defined. Do not try to import them or any other modules by yourself.

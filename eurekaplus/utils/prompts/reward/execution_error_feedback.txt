@@ -1,5 +1,4 @@
 Executing the reward function code above has the following error: {traceback_msg}. Please fix the bug and provide a new, improved reward function!
 Tips: 
-1. If it is function name not defined error, it may be because you forget to put all codes together into a single python block for user extraction, or you try to import unknown python packages, which is not allowed.
-2. If it is tensor shape mismatch error, e.g. broadcast shape error, it means the output of your sub-reward function is not in a shape of (num_envs, ), maybe try to revise the function or to reshape using `tensor.squeeze()`
-3. If it is no module error, revise your codes without import any unknown python packages.
+1. If it is a "function name not defined" error or "no module" error, it may be because you try to import unknown Python packages, which is not allowed. Revise your codes without importing any unknown Python packages.
+2. If it is a tensor shape mismatch error, it means the output of your sub-reward function is not in a shape of (num_envs, ), maybe try to revise the function or to reshape using `tensor.squeeze()`

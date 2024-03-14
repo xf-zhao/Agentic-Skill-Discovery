@@ -1,5 +1,5 @@
 Please carefully analyze the feedback and provide a new, improved success function that can better solve the task. Some helpful tips for analyzing the feedback:
-    (2) If the values for a certain reward component are near identical throughout, then this means RL is not able to optimize this component as it is written. You may consider
+    (2) If the values for a certain reward component are nearly identical throughout, then this means RL is not able to optimize this component as it is written. You may consider
         (a) Changing its scale or the value of its temperature parameter
         (b) Re-writing the reward component 
         (c) Discarding the reward component
