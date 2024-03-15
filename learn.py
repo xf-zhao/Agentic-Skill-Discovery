@@ -8,7 +8,7 @@ from pathlib import Path
 from eurekaplus.utils.misc import *
 from eurekaplus.utils.extract_task_code import *
 from zero_hero.behavior import BehaviorCaptioner
-from zero_hero.core import EnvNode, TaskNode
+from zero_hero.core import TaskNode
 from zero_hero.task import TaskDatabase
 
 
@@ -23,7 +23,7 @@ def main(cfg):
     logging.info(cfg)
     env_name = cfg.env.env_name.lower()
     task = cfg.task
-    specified_task = task is not None and len(task) >0
+    specified_task = task is not None and len(task) > 0
     seed = 99 if specified_task else cfg.seed
     env_idx = f"E{seed:02d}"
     tdb = TaskDatabase(
@@ -37,16 +37,17 @@ def main(cfg):
         logging.info(f"Nothing to do with task database {tdb.store_path}!")
         return
     cfg.task = task
+    cfg.seed = seed
     my_cfg = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     wandbrun = wandb.init(
         project=cfg.wandb_project,
         config=my_cfg,
     )
-    precedents=cfg.precedents
+    precedents = cfg.precedents
     if precedents is not None:
         if isinstance(precedents, str):
             if len(precedents) > 0:
-                precedents = precedents.split(',')
+                precedents = precedents.split(",")
             else:
                 precedents = None
         elif isinstance(precedents, list):
@@ -106,24 +107,33 @@ def main(cfg):
                 }
             )
 
-    if task_node.num_variants > 0:
-        task_status = "completed"
+    def get_wants(task_stat, want_key="variants_video_"):
         rids = []
-        want_key = "variants_video_"
         for k in task_stat:
             if k.startswith(want_key):
                 rid = k.split(want_key)[-1]
                 rids.append(rid)
+        return rids
+
+    if task_node.num_variants > 0:
+        task_status = "completed"
+        rids = get_wants(task_stat=task_stat, want_key="variants_video_")
         logging.info(
             f"Collected new skill {task} with {task_node.num_variants} variants: {rids}."
         )
-    elif task_node.num_variants == 0:
-        task_status = "failed"
-        logging.info(f"Mission impossible on {task}.")
+        variants = rids[0]
     else:
-        raise NotImplementedError
+        if task_node.num_candidates > 0:
+            task_status = "compromised"
+            logging.info(f"Mission compromised on {task}.")
+            rids = get_wants(task_stat=task_stat, want_key="candidates_video_")
+            variants = rids[0]
+        else:
+            task_status = "failed"
+            logging.info(f"Mission impossible on {task}.")
+            variants = ""
     tdb.load()
-    tdb.update_task({"command": task, "status": task_status, "variants": rids[0]})
+    tdb.update_task({"command": task, "status": task_status, "variants": variants})
     tdb.save()
     tdb.render()
     logging.info(f"Done! for task: {task}.")

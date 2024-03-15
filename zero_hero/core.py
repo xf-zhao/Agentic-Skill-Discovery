@@ -502,7 +502,8 @@ class RewardNode(Node):
         self.rl_filepath = f"{self.idx}-{self.ite}.txt"
         if self.precedents is None:
             self.precedents = self.parent.parent.precedents
-        self.success_idx = self.parent.idx
+        if self.parent is not None:
+            self.success_idx = self.parent.idx
         self.cur_env_dir = cur_env_dir
         self.log_dir = f"{self.cur_env_dir}/logs"
 
@@ -596,7 +597,7 @@ class RewardNode(Node):
         self._block_until_training()
         return self
 
-    def play(self):
+    def play(self, suffix="_videos"):
         self._prepare_launch()
 
         # Execute the python file with flags
@@ -606,6 +607,8 @@ class RewardNode(Node):
             f"{self.root_dir}/rsl_rl/play.py",
             "--task",
             f"{self.idx}",
+            "--suffix",
+            suffix,
             "--num_envs",
             "1",
             "--video",
@@ -1174,12 +1177,12 @@ class TaskNode(Node):
                 num_optimized.append(0)
                 success_child.unlink()
 
-        def wrap_variant_video(variant_videos):
+        def wrap_variant_video(variant_videos, prefix="variants"):
             video_stats = {}
             for v_path in variant_videos:
                 v_idx = v_path.split("/")[-4]
                 wandb_video = {
-                    f"variants_video_{v_idx}": wandb.Video(v_path, fps=30, format="mp4")
+                    f"{prefix}_video_{v_idx}": wandb.Video(v_path, fps=30, format="mp4")
                 }
                 video_stats.update(wandb_video)
             return video_stats
@@ -1191,8 +1194,8 @@ class TaskNode(Node):
                 [a == b for a, b in zip(num_f_succ, num_v_succ)]
             ).mean(),
             "num_optimized": np.array(num_optimized).mean(),
-            **wrap_variant_video(variant_videos),
-            **wrap_variant_video(candidate_videos),
+            **wrap_variant_video(variant_videos, prefix="variants"),
+            **wrap_variant_video(candidate_videos, prefix="candidates"),
         }
 
         return stat

@@ -16,21 +16,21 @@ seed: 0
 temperature: 1
 debug: False
 headless: False
-max_iterations: 1500 # RL Policy training iterations (decrease this to make the feedback loop faster)
-num_envs: 2048
-memory_requirement: 16
-min_gpu_mem: 16
+max_iterations: 100 # RL Policy training iterations (decrease this to make the feedback loop faster)
+num_envs: 1024
+memory_requirement: 8
+min_gpu_mem: 8
 video: False
 target_num_skills: 64
 failed_tolerance: 128
 proposal_batch: 10
-task_iterations: 3 # iterate to acquire more variants
-n_success_samples: 3 # number of samples to generate success function per iteration
+task_iterations: 1 # iterate to acquire more variants
+n_success_samples: 1 # number of samples to generate success function per iteration
 n_reward_samples: 3 # number of samples to generate reward function per iteration
-reward_iterations: 3
+reward_iterations: 1
 num_variants: 1 # break if sufficient
 task: ''
-mission: "Pick up Cube A with the gripper."
+mission: "Reach Cube A."
 precedents: null
 # precedents: "R8486375e,R8486375e"
 

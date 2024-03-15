@@ -34,6 +34,12 @@ parser.add_argument(
 )
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument(
+    "--suffix",
+    type=str,
+    default="_videos",
+    help="Name suffix of the folder to store videos.",
+)
+parser.add_argument(
     "--seed", type=int, default=None, help="Seed used for the environment"
 )
 parser.add_argument(
@@ -131,7 +137,7 @@ def main():
     resume_path = get_checkpoint_path(
         log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint
     )
-    log_dir = resume_path.replace(".pt", "_videos")
+    log_dir = resume_path.replace(".pt", args_cli.suffix)
     print(f"[INFO]: Loading model checkpoint from: {resume_path}")
 
     # adjust camera resolution and pose

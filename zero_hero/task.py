@@ -11,7 +11,7 @@ class Database:
             variants = self.df[self.df["command"] == task][attr]
         else:
             raise NotImplementedError
-        return variants
+        return variants.values
 
 
 class TaskDatabase(Database):
@@ -95,6 +95,8 @@ class TaskDatabase(Database):
         return
 
     def update_task(self, task: dict):
+        if not task in self.df["command"]:
+            self.add_task(task)
         df = self.df
         df.loc[df.command == task["command"], "status"] = task["status"]
         df.loc[df.command == task["command"], "variants"] = task["variants"]
