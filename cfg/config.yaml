@@ -12,7 +12,7 @@ resume: True
 # LLM parameters
 # model: gpt-4-0125-preview
 model: gpt-3.5-turbo-0125  # LLM model (other options are gpt-4, gpt-4-0613, gpt-3.5-turbo-16k-0613)
-seed: 0
+seed: 99
 temperature: 1
 debug: False
 headless: True
@@ -29,9 +29,10 @@ n_success_samples: 3 # number of samples to generate success function per iterat
 n_reward_samples: 3 # number of samples to generate reward function per iteration
 reward_iterations: 3
 num_variants: 1 # break if sufficient
-task: ''
-mission: "Reach Cube A."
+task: 'Reach cube B.'
+mission: ''
 precedents: null
+machine: 'cluster' # local
 # precedents: "R8486375e,R8486375e"
 # Weights and Biases
 wandb_project: "Zero-Hero" # wandb project if logging with wandb

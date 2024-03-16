@@ -79,7 +79,7 @@ class TaskDatabase(Database):
 
     def add_task(self, task: str):
         df = self.df
-        if task in self.df["command"]:
+        if task in self.df["command"].values:
             self.refresh_task(task)
         else:
             row = pd.Series({"command": task, "status": "todo", "variants": ""})
@@ -96,7 +96,7 @@ class TaskDatabase(Database):
 
     def update_task(self, task: dict):
         command = task['command']
-        if not command in self.df["command"]:
+        if command not in self.df["command"].values:
             self.add_task(command)
         df = self.df
         df.loc[df.command == command, "status"] = task["status"]
@@ -111,6 +111,8 @@ class TaskDatabase(Database):
 
     def save(self):
         self.df.to_csv(self.store_path, index=False)
+        print(f'self.df:\n {self.df}')
+        print(f'Saved data to {self.store_path}')
 
     def render(self):
         df = self.df

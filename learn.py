@@ -134,7 +134,6 @@ def main(cfg):
             variants = ""
     tdb.load()
     tdb.update_task({"command": task, "status": task_status, "variants": variants})
-    tdb.save()
     tdb.render()
     logging.info(f"Done! for task: {task}.")
 
