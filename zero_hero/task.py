@@ -95,11 +95,12 @@ class TaskDatabase(Database):
         return
 
     def update_task(self, task: dict):
-        if not task in self.df["command"]:
-            self.add_task(task)
+        command = task['command']
+        if not command in self.df["command"]:
+            self.add_task(command)
         df = self.df
-        df.loc[df.command == task["command"], "status"] = task["status"]
-        df.loc[df.command == task["command"], "variants"] = task["variants"]
+        df.loc[df.command == command, "status"] = task["status"]
+        df.loc[df.command == command, "variants"] = task["variants"]
         self.df = df
         self.save()
         return
