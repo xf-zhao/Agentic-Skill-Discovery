@@ -29,7 +29,7 @@ n_success_samples: 3 # number of samples to generate success function per iterat
 n_reward_samples: 3 # number of samples to generate reward function per iteration
 reward_iterations: 3
 num_variants: 1 # break if sufficient
-task: 'Reach cube B.'
+task: ''
 mission: ''
 precedents: null
 machine: 'cluster' # local
