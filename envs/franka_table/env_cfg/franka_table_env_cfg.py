@@ -64,7 +64,7 @@ from envs.franka_table import mdp
 
 import sys, os
 
-from zero_hero.core import ZEROHERO_ROOT_DIR
+ZEROHERO_ROOT_DIR = os.environ["ZEROHERO_ROOT_DIR"]
 
 
 @configclass
