@@ -8,11 +8,8 @@ from pathlib import Path
 from eurekaplus.utils.misc import *
 from eurekaplus.utils.extract_task_code import *
 from zero_hero.behavior import BehaviorCaptioner
-from zero_hero.core import TaskNode
+from zero_hero.core import TaskNode, ZEROHERO_ROOT_DIR
 from zero_hero.task import TaskDatabase
-
-
-ZEROHERO_ROOT_DIR = f"{os.getcwd()}"
 
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")

@@ -15,9 +15,9 @@ from utils.misc import *
 from utils.file_utils import find_files_with_substring, load_tensorboard_logs
 from utils.create_task import create_task
 from utils.extract_task_code import *
+from zero_hero.core import ZEROHERO_ROOT_DIR
 
 EUREKA_ROOT_DIR = os.getcwd()
-ZEROHERO_ROOT_DIR = f'{EUREKA_ROOT_DIR}/../'
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")
 def main(cfg):

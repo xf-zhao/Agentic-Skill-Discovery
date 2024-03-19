@@ -2,11 +2,8 @@ import hydra
 import logging
 import os
 import openai
-from zero_hero.core import EnvNode
+from zero_hero.core import EnvNode, ZEROHERO_ROOT_DIR
 from zero_hero.task import TaskDatabase
-
-
-ZEROHERO_ROOT_DIR = f"{os.getcwd()}"
 
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")

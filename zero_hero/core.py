@@ -24,7 +24,7 @@ from .task import TaskDatabase
 
 DUMMY_FAILURE = -10000.0
 ORBIT_ROOT_DIR = os.environ["ORBIT_ROOT_DIR"]
-ZERO_HERO_ROOT_DIR = os.environ["ZEROHERO_ROOT_DIR"]
+ZEROHERO_ROOT_DIR = os.environ["ZEROHERO_ROOT_DIR"]
 ISAAC_ROOT_DIR = f"{ORBIT_ROOT_DIR}/_isaac_sim"
 
 MODULE_INIT = """
@@ -224,7 +224,7 @@ class Node:
         resume=True,
     ) -> None:
         self.resume = resume
-        self.root_dir = root_dir if root_dir is not None else ZERO_HERO_ROOT_DIR
+        self.root_dir = root_dir if root_dir is not None else ZEROHERO_ROOT_DIR
         self.prompt_dir = f"{self.root_dir}/eurekaplus/utils/prompts"
         self.env_name = env_name
         self.type = type
@@ -655,7 +655,7 @@ class RewardNode(Node):
             for precedent in self.precedents:
                 if not precedent.startswith("/"):
                     precedent = (
-                        f"{ZERO_HERO_ROOT_DIR}/envs_gpt/{self.env_name}/{precedent}"
+                        f"{ZEROHERO_ROOT_DIR}/envs_gpt/{self.env_name}/{precedent}"
                     )
                 run_command.append(precedent)
         print(f"Executing commands: {run_command}")

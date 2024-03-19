@@ -64,9 +64,7 @@ from envs.franka_table import mdp
 
 import sys, os
 
-ZEROHERO_ROOT_DIR = os.path.abspath(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-)
+from zero_hero.core import ZEROHERO_ROOT_DIR
 
 
 @configclass
