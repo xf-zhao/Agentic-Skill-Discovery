@@ -32,7 +32,6 @@ num_variants: 1 # break if sufficient
 task: ''
 mission: ''
 precedents: null
-machine: 'cluster' # local
 # precedents: "R8486375e,R8486375e"
 # Weights and Biases
 wandb_project: "Zero-Hero" # wandb project if logging with wandb
