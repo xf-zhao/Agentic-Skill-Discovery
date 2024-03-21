@@ -1,0 +1,45 @@
+defaults:
+  - _self_
+  - env: franka_table
+  - exploit: exploit
+  - override hydra/launcher: local
+  - override hydra/output: local
+
+hydra:
+  job:
+    chdir: True
+
+resume: True
+seed: 99
+# LLM parameters
+# model: gpt-4-0125-preview
+model: gpt-3.5-turbo-0125 # LLM model (other options are gpt-4, gpt-4-0613, gpt-3.5-turbo-16k-0613)
+temperature: 1
+debug: False
+
+proposal:
+  target_num_skills: 64
+  failed_tolerance: 256
+  proposal_batch: 10
+
+task_node:
+  iterations: 3 # iterate to acquire more variants
+  num_variants: 1 # break if sufficient
+  task: ""
+
+success_node:
+  n_success_samples: 3 # number of samples to generate success function per iteration
+
+reward_node:
+  n_reward_samples: 3 # number of samples to generate reward function per iteration
+  iterations: 3
+  precedents: null
+  num_envs: 2048
+  memory_requirement: 12
+  min_gpu_mem: 12
+  max_iterations: 1500 # RL Policy training iterations (decrease this to make the feedback loop faster)
+  headless: True
+  video: False
+
+use_wandb: True
+wandb_project: "Zero-Hero" # wandb project if logging with wandb

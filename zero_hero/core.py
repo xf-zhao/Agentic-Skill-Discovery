@@ -223,6 +223,8 @@ class Node:
         ite=0,
         resume=True,
         precedents = None,
+        *args,
+        **kwargs,
     ) -> None:
         self.resume = resume
         self.root_dir = root_dir if root_dir is not None else ZEROHERO_ROOT_DIR
