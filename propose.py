@@ -9,16 +9,14 @@ from zero_hero.task import TaskDatabase
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")
 def main(cfg):
     openai.api_key = os.getenv("OPENAI_API_KEY")
-    model = cfg.model
-    logging.info(cfg)
-    logging.info(f"Using LLM: {model}")
+    model = cfg.proposal.model
     env_name = cfg.env.env_name.lower()
     env_idx = f"E{cfg.seed:02d}"
     tdb = TaskDatabase(
         store_path=f'{ZEROHERO_ROOT_DIR}/envs_gpt/tasks/{env_name.replace(" ","_")}_{env_idx}.csv',
-        target_num_skills=cfg.target_num_skills,
-        failed_tolerance=cfg.failed_tolerance,
-        proposal_batch=cfg.proposal_batch,
+        target_num_skills=cfg.proposal.target_num_skills,
+        failed_tolerance=cfg.proposal.failed_tolerance,
+        proposal_batch=cfg.proposal.proposal_batch,
     )
     env_node = EnvNode(
         task_database=tdb,

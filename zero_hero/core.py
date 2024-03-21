@@ -222,11 +222,13 @@ class Node:
         temperature=0,
         ite=0,
         resume=True,
+        precedents = None,
     ) -> None:
         self.resume = resume
         self.root_dir = root_dir if root_dir is not None else ZEROHERO_ROOT_DIR
         self.prompt_dir = f"{self.root_dir}/eurekaplus/utils/prompts"
         self.env_name = env_name
+        self.precedents = precedents
         self.type = type
         self.parent = None
         self.children = []
@@ -448,7 +450,6 @@ class RewardNode(Node):
         task_ite=1,
         reward_ite=1,
         behavior_captioner: BehaviorCaptioner = None,
-        precedents=None,
         *args,
         **kwargs,
     ) -> None:
@@ -467,7 +468,6 @@ class RewardNode(Node):
         self.play_run = None
         self.rl_filepath = None
         self.play_filepath = None
-        self.precedents = precedents
         self.memory_requirement = memory_requirement
         self.min_gpu_mem = min_gpu_mem
         self.policy_feedback = file_to_string(
@@ -500,8 +500,6 @@ class RewardNode(Node):
         super().init()
         cur_env_dir = f"{self.root_dir}/envs_gpt/{self.env_name}/{self.idx}"
         self.rl_filepath = f"{self.idx}-{self.ite}.txt"
-        if self.precedents is None:
-            self.precedents = self.parent.parent.precedents
         if self.parent is not None:
             self.success_idx = self.parent.idx
         self.cur_env_dir = cur_env_dir
@@ -926,6 +924,7 @@ class SuccessNode(Node):
                 task_ite=task_ite,
                 reward_ite=reward_ite,
                 behavior_captioner=behavior_captioner,
+                precedents=self.precedents,
             )
             self.add_child(child)
             child.init()
@@ -1041,13 +1040,11 @@ class TaskNode(Node):
         variants=None,
         status_output=None,
         candidates=None,
-        precedents=None,
         *args,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.type = "Task"
-        self.precedents = precedents
         self.initial_system = file_to_string(
             f"{self.prompt_dir}/success/initial_system.txt"
         )
@@ -1135,6 +1132,7 @@ class TaskNode(Node):
                 n_samples=n_samples,
                 temperature=temperature,
                 model=model,
+                precedents = self.precedents,
             )
             self.add_child(child)
             child.init()
