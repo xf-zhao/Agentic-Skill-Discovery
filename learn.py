@@ -104,27 +104,17 @@ def main(cfg):
                 }
             )
 
-    def get_wants(task_stat, want_key="variants_video_"):
-        rids = []
-        for k in task_stat:
-            if k.startswith(want_key):
-                rid = k.split(want_key)[-1]
-                rids.append(rid)
-        return rids
-
     if task_node.num_variants > 0:
         task_status = "completed"
-        rids = get_wants(task_stat=task_stat, want_key="variants_video_")
+        variants = task_node.variants[0]
         logging.info(
-            f"Collected new skill {task} with {task_node.num_variants} variants: {rids}."
+            f"Collected new skill {task} with {task_node.num_variants} variants: {variants}."
         )
-        variants = rids[0]
     else:
         if task_node.num_candidates > 0:
             task_status = "compromised"
-            logging.info(f"Mission compromised on {task}.")
-            rids = get_wants(task_stat=task_stat, want_key="candidates_video_")
-            variants = rids[0]
+            variants = task_node.candidates
+            logging.info(f"Mission compromised on {task} with candidates: {variants}.")
         else:
             task_status = "failed"
             logging.info(f"Mission impossible on {task}.")
