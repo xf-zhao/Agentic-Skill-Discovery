@@ -99,7 +99,10 @@ REWARD_REPLACE_OUTPUT = """
 @configclass
 class RewardsCfg:
 
-    success = SuccessCfg().success
+    try:
+        success = SuccessCfg().success
+    except:
+        success = list(SuccessCfg().__dict__.values())[0]
     terminate_1 = get_terminate_penalty(TerminationsCfg().cube_a_dropping)
     terminate_2 = get_terminate_penalty(TerminationsCfg().cube_b_dropping)
     terminate_3 = get_terminate_penalty(TerminationsCfg().plate_dropping)
