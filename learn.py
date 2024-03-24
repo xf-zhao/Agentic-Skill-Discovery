@@ -62,13 +62,13 @@ def main(cfg):
         init_sys_prompt=f"{task_node.prompt_dir}/task/behavior_context.txt",
     )
     logging.info(f"Learning skill: {task}.")
-    for task_ite in range(cfg.task_iterations):
+    for task_ite in range(cfg.task_iterations): # task_node.temperature += 0.2
         if task_node.num_variants >= cfg.num_variants:
             break
         success_nodes = task_node.propose(
             n_samples=cfg.n_reward_samples,
             iterations=2,
-            temperature=cfg.temperature,
+            temperature=cfg.temperature + task_ite * 0.2,
             model=cfg.model,
         )  # params for child init
         for reward_ite in range(cfg.reward_iterations):
