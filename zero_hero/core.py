@@ -227,6 +227,7 @@ class Node:
         resume=True,
         precedents=None,
         local_num_syntax_error=0,
+        conversation_dir=None,
         *args,
         **kwargs,
     ) -> None:
@@ -250,6 +251,11 @@ class Node:
         self.summary = None
         self.ite = ite
         self.local_num_syntax_error = local_num_syntax_error
+        self.conversation_dir = (
+            f"{self.root_dir}/envs_gpt/converstions"
+            if conversation_dir is None
+            else conversation_dir
+        )
         self.env_file = (
             f"{self.root_dir}/envs/{self.env_name}/env_cfg/{self.env_name}_env_cfg.py"
         )
@@ -453,6 +459,17 @@ class Node:
         df_udpate.to_csv(record_file, index=False, header=True)
         return
 
+    def _save_conversation(self):
+        conversation_path = self.conversation_dir + f"/{self.idx}.txt"
+        if not os.path.exists(self.conversation_dir):
+            os.makedirs(self.conversation_dir, exist_ok=True)
+        with open(conversation_path, "w") as f:
+            for msg in self.messages:
+                role, content = msg["role"], msg["content"]
+                line = f"<<< {role} START >>>\n{content} \n<<< {role} END >>>"
+                f.writeline(line)
+        return
+
 
 class RewardNode(Node):
     def __init__(
@@ -651,11 +668,12 @@ class RewardNode(Node):
         data = {
             **self.playbacks,
             "gpt-4v-succ": v_succ,
-            "gpt-4v-description": description,
         }
+        data_extra = data.copy()
+        data_extra["gpt-4v-description"] = (description,)
         # only caption for best node of succ node
         self._write_record_line(data, self.best_record)
-        return data
+        return data_extra
 
     def summarize(self):
         summary = self._summarize_runlog()
@@ -818,6 +836,7 @@ class RewardNode(Node):
         self.success = success
         self.exec_success = exec_success
         self._write_record_line(self.record_data, self.record)
+        self._save_conversation()
         return summary
 
 
@@ -1161,16 +1180,17 @@ class TaskNode(Node):
         num_optimized = []
         num_v_succ = []
         num_f_succ = []
-        variant_videos = []
-        candidate_videos = []
+        variant_videos, candidate_videos = [], []
+        variant_video_captions, candidate_video_captions = [], []
         for success_child in children_bak:
             if success_child.best_reward is not None:
                 num_optimized.append(1)
                 caption_data = success_child.best_reward.caption()
                 f_succ = int(success_child.best_reward.summary["success"] > 0)
                 num_f_succ.append(f_succ)
-                v_succ = caption_data["gpt-4v-succ"]
                 video_path = caption_data["video_path"]
+                v_succ = caption_data["gpt-4v-succ"]
+                video_caption = caption_data["gpt-4v-description"]
                 if v_succ:
                     num_v_succ.append(1)
                 else:
@@ -1179,12 +1199,14 @@ class TaskNode(Node):
                     self._collect_variant(success_child)
                     if video_path is not None:
                         variant_videos.append(video_path)
+                        variant_video_captions.append(video_caption)
                     # control whether to re-use good success functions
                     self.add_child(success_child)
                 else:
                     self._collect_candidate(success_child)
                     if video_path is not None:
                         candidate_videos.append(video_path)
+                        candidate_video_captions.append(video_caption)
                     success_child.unlink()
             else:
                 num_f_succ.append(0)
@@ -1192,12 +1214,14 @@ class TaskNode(Node):
                 num_optimized.append(0)
                 success_child.unlink()
 
-        def wrap_variant_video(variant_videos, prefix="variants"):
+        def wrap_variant_video(variant_videos, captions=None, prefix="variants"):
             video_stats = {}
-            for v_path in variant_videos:
+            for v_path, video_caption in zip(variant_videos, captions):
                 v_idx = v_path.split("/")[-4]
                 wandb_video = {
-                    f"{prefix}_video_{v_idx}": wandb.Video(v_path, fps=30, format="mp4")
+                    f"{prefix}_video_{v_idx}": wandb.Video(
+                        v_path, caption=video_caption, fps=30, format="mp4"
+                    )
                 }
                 video_stats.update(wandb_video)
             return video_stats
@@ -1209,8 +1233,12 @@ class TaskNode(Node):
                 [a == b for a, b in zip(num_f_succ, num_v_succ)]
             ).mean(),
             "num_optimized": np.array(num_optimized).mean(),
-            **wrap_variant_video(variant_videos, prefix="variants"),
-            **wrap_variant_video(candidate_videos, prefix="candidates"),
+            **wrap_variant_video(
+                variant_videos, variant_video_captions, prefix="variants"
+            ),
+            **wrap_variant_video(
+                candidate_videos, candidate_video_captions, prefix="candidates"
+            ),
         }
 
         return stat
