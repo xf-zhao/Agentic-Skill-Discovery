@@ -225,7 +225,8 @@ class Node:
         temperature=0,
         ite=0,
         resume=True,
-        precedents = None,
+        precedents=None,
+        local_num_syntax_error=0,
         *args,
         **kwargs,
     ) -> None:
@@ -248,6 +249,7 @@ class Node:
         self.code = code
         self.summary = None
         self.ite = ite
+        self.local_num_syntax_error = local_num_syntax_error
         self.env_file = (
             f"{self.root_dir}/envs/{self.env_name}/env_cfg/{self.env_name}_env_cfg.py"
         )
@@ -342,6 +344,7 @@ class Node:
         return code_string
 
     def _loop_until_no_syntax_err(self, messages, response=None, replacements={}):
+        local_num_syntax_error = 0
         init_messages = messages.copy()
         for t in range(10):
             messages = init_messages.copy()
@@ -367,6 +370,7 @@ class Node:
                         [response["message"], self._wrap_user_message(err_feedback)]
                     )
                     self.num_syntax_error += 1
+                    local_num_syntax_error += 1
                     response = None
                 else:
                     for k, v in replacements.items():
@@ -374,7 +378,7 @@ class Node:
                     break
             if not gpt_err:
                 break
-        return messages, response, code, no_err
+        return messages, response, code, no_err, local_num_syntax_error
 
     def _syntax_examine(
         self,
@@ -438,6 +442,17 @@ class Node:
     def _wrap_message(self, content, role="user"):
         return {"role": role, "content": content}
 
+    def _write_record_line(self, data, record_file):
+        if os.path.exists(record_file):
+            df = pd.read_csv(record_file)
+            df_udpate = pd.concat(
+                [df, pd.DataFrame([data], columns=df.columns)]
+            ).reset_index(drop=True)
+        else:
+            df_udpate = pd.DataFrame([data])
+        df_udpate.to_csv(record_file, index=False, header=True)
+        return
+
 
 class RewardNode(Node):
     def __init__(
@@ -490,16 +505,14 @@ class RewardNode(Node):
         self.playbacks = None
         if record is None:
             record_dir = f"{self.root_dir}/envs_gpt/records"
-            record = f"{record_dir}/{self.env_name}_record.csv"
+            self.record = f"{record_dir}/{self.env_name}_record.csv"
             if not os.path.exists(record_dir):
                 os.makedirs(record_dir)
-        self.record = record
         if best_record is None:
             best_record_dir = f"{self.root_dir}/envs_gpt/records"
-            best_record = f"{best_record_dir}/{self.env_name}_best_record.csv"
+            self.best_record = f"{best_record_dir}/{self.env_name}_best_record.csv"
             if not os.path.exists(best_record_dir):
                 os.makedirs(best_record_dir)
-        self.best_record = best_record
 
     def init(self):
         super().init()
@@ -640,9 +653,8 @@ class RewardNode(Node):
             "gpt-4v-succ": v_succ,
             "gpt-4v-description": description,
         }
-        self._write_record_line(
-            data, self.best_record
-        )  # only caption for best node of succ node
+        # only caption for best node of succ node
+        self._write_record_line(data, self.best_record)
         return data
 
     def summarize(self):
@@ -691,10 +703,10 @@ class RewardNode(Node):
         data = {
             "task": self.task,
             "task_ite": self.task_ite,
+            "reward_ite": self.reward_ite,
             "success_idx": self.success_idx,
             "reward_idx": self.idx,
-            "reward_ite": self.reward_ite,
-            "num_syntax_error": self.num_syntax_error,
+            "reward_num_syntax_error": self.local_num_syntax_error,
             "exec_success": self.exec_success,
             "success": self.success,
         }
@@ -808,12 +820,6 @@ class RewardNode(Node):
         self._write_record_line(self.record_data, self.record)
         return summary
 
-    def _write_record_line(self, data, record_file):
-        line = pd.DataFrame([data]).to_csv(index=False, header=False)
-        with open(record_file, "w+") as frecord:
-            frecord.write(line)
-        return
-
 
 class SuccessNode(Node):
     def __init__(
@@ -903,14 +909,16 @@ class SuccessNode(Node):
             logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
 
         for response in responses:
-            messages, response, code, no_err = self._loop_until_no_syntax_err(
-                messages=self.messages,
-                response=response,
-                replacements={
-                    REWARD_REPLACE_INPUT: REWARD_REPLACE_OUTPUT,
-                    "@torch.jit.script": "",
-                    "@staticmethod": "",
-                },
+            messages, response, code, no_err, local_num_syntax_error = (
+                self._loop_until_no_syntax_err(
+                    messages=self.messages,
+                    response=response,
+                    replacements={
+                        REWARD_REPLACE_INPUT: REWARD_REPLACE_OUTPUT,
+                        "@torch.jit.script": "",
+                        "@staticmethod": "",
+                    },
+                )
             )
             if not no_err:
                 continue
@@ -930,6 +938,7 @@ class SuccessNode(Node):
                 reward_ite=reward_ite,
                 behavior_captioner=behavior_captioner,
                 precedents=self.precedents,
+                local_num_syntax_error=local_num_syntax_error,
             )
             self.add_child(child)
             child.init()
@@ -954,7 +963,7 @@ class SuccessNode(Node):
             return any_success, stat
 
         successes = [child.summary["success"] for child in self.children]
-        syntax_errors = [child.num_syntax_error for child in self.children]
+        syntax_errors = [child.local_num_syntax_error for child in self.children]
         # Select the best code sample based on the success rate
         best_sample_idx = np.argmax(np.array(successes))
         best_reward = self.children[best_sample_idx]
@@ -1119,11 +1128,13 @@ class TaskNode(Node):
             logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
 
         for response in responses:
-            messages, response, code, no_err = self._loop_until_no_syntax_err(
-                messages=self.messages,
-                response=response,
-                # replacements={"weight=": "weight=30.0, #", "@torch.jit.script": ""},
-                replacements={"@torch.jit.script": ""},
+            messages, response, code, no_err, local_num_syntax_error = (
+                self._loop_until_no_syntax_err(
+                    messages=self.messages,
+                    response=response,
+                    # replacements={"weight=": "weight=30.0, #", "@torch.jit.script": ""},
+                    replacements={"@torch.jit.script": ""},
+                )
             )
             if not no_err:
                 continue
@@ -1137,7 +1148,8 @@ class TaskNode(Node):
                 n_samples=n_samples,
                 temperature=temperature,
                 model=model,
-                precedents = self.precedents,
+                precedents=self.precedents,
+                local_num_syntax_error=local_num_syntax_error,
             )
             self.add_child(child)
             child.init()
