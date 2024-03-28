@@ -132,7 +132,7 @@ def gpt_call(
     n_samples=1,
     temperature=0,
 ):
-    responses = []
+    choices = []
     total_samples = 0
     total_completion_token = 0
     total_token = 0
@@ -161,13 +161,13 @@ def gpt_call(
                 err_msg = f"Attempt {attempt+1} failed with error: {e}"
                 logging.info(err_msg)
                 if "maximum context length" in err_msg:
-                    responses = None
+                    choices = None
                     return
                 time.sleep(1)
         if response_cur is None:
             logging.info("Code terminated due to too many failed attempts!")
             exit()
-        responses.extend(response_cur["choices"])
+        choices.extend(response_cur["choices"])
         prompt_tokens = response_cur["usage"]["prompt_tokens"]
         total_completion_token += response_cur["usage"]["completion_tokens"]
         total_token += response_cur["usage"]["total_tokens"]
@@ -176,10 +176,10 @@ def gpt_call(
     logging.info(
         f">>> Prompt Tokens: {prompt_tokens}, Completion Tokens: {total_completion_token}, Total Tokens: {total_token}"
     )
-    return responses
+    return choices
 
 
-def extract_code_string(response, combine_all=False, log=False):
+def extract_code_string(responses, combine_all=False, log=False):
     patterns = [
         r"```python(.*?)```",
         r"```(.*?)```",
@@ -187,7 +187,9 @@ def extract_code_string(response, combine_all=False, log=False):
         r'""(.*?)""',
         r'"(.*?)"',
     ]
-    content = response["message"]["content"]
+    content = ""
+    for resp in responses:
+        content += resp["content"]
     # Regex patterns to extract python code enclosed in GPT response
     code_string = ""
     for pattern in patterns:
@@ -246,7 +248,7 @@ class Node:
         self.temperature = temperature
         self.idx = idx
         self.messages = messages
-        self.response = response
+        self.response = [] if response is None else response
         self.code = code
         self.summary = None
         self.ite = ite
@@ -341,6 +343,19 @@ class Node:
     def remove(self):
         raise NotImplementedError
 
+    def say(self):
+        words = self.words()
+        print(words)
+        return self
+
+    def words(self):
+        word = ""
+        for msg in [*self.messages, *self.response]:
+            role = msg["role"]
+            word = word + "=" * 50 + f"<<< {role} >>>" + "=" * 50 + "\n"
+            word = word + msg["content"] + "\n"
+        return word
+
     def _extract_env_obs(self):
         env_obs_code_string = file_to_string(self.env_obs_file)
         pattern = r"class MyObservationCfg.*:(.*?)def __post_init__.*"
@@ -350,41 +365,43 @@ class Node:
         return code_string
 
     def _loop_until_no_syntax_err(self, messages, response=None, replacements={}):
+        if response is None:
+            response = []
+            syntax_valid = False
+        else:
+            response = [response]
+            syntax_valid = True
         local_num_syntax_error = 0
-        init_messages = messages.copy()
+        messages = messages.copy()
         for t in range(10):
-            messages = init_messages.copy()
             gpt_err = False
             for _ in range(5):
-                if response is None:
-                    responses = gpt_call(
-                        messages=messages,
+                if not syntax_valid:
+                    choices = gpt_call(
+                        messages=[*messages, *response],
                         model=self.model,
                         n_samples=1,
                         temperature=self.temperature + t * 0.1,
                     )
-                    if responses is None:
+                    if choices is None:
                         gpt_err = True
                         break
                     else:
                         gpt_err = False
-                        response = responses[0]
-                code = extract_code_string(response=response, combine_all=True)
-                no_err, err_feedback = self._syntax_examine(code)
-                if not no_err:
-                    messages.extend(
-                        [response["message"], self._wrap_user_message(err_feedback)]
-                    )
+                        response.extend(choices[0]["message"])
+                code = extract_code_string(responses=response, combine_all=True)
+                syntax_valid, err_feedback = self._syntax_examine(code)
+                if not syntax_valid:
+                    response.extend(self._wrap_user_message(err_feedback))
                     self.num_syntax_error += 1
                     local_num_syntax_error += 1
-                    response = None
                 else:
                     for k, v in replacements.items():
                         code = code.replace(k, v)
                     break
             if not gpt_err:
                 break
-        return messages, response, code, no_err, local_num_syntax_error
+        return messages, response, code, syntax_valid, local_num_syntax_error
 
     def _syntax_examine(
         self,
@@ -423,7 +440,7 @@ class Node:
             subprocess.check_output(["python3", temp.name], stderr=subprocess.STDOUT)
             if remove_temp:
                 os.remove(temp.name)
-            no_err = True
+            valid = True
             logging.info(f"No syntax error, continue to build graph.")
         except subprocess.CalledProcessError as e:
             exec_msg = e.output.decode()
@@ -433,8 +450,8 @@ class Node:
             err_feedback = self.execution_error_feedback.format(
                 traceback_msg=traceback_msg
             )
-            no_err = False
-        return no_err, err_feedback
+            valid = False
+        return valid, err_feedback
 
     def _wrap_system_message(self, content):
         return self._wrap_message(content=content, role="system")
@@ -467,7 +484,7 @@ class Node:
             for msg in self.messages:
                 role, content = msg["role"], msg["content"]
                 line = f"<<< {role} START >>>\n{content} \n<<< {role} END >>>"
-                f.writeline(line)
+                f.write(line)
         return
 
 
@@ -530,8 +547,11 @@ class RewardNode(Node):
             self.best_record = f"{best_record_dir}/{self.env_name}_best_record.csv"
             if not os.path.exists(best_record_dir):
                 os.makedirs(best_record_dir)
+        # For gpt-4-v
+        self.data_extra = None
 
     def init(self):
+        self.data_extra = None
         super().init()
         cur_env_dir = f"{self.root_dir}/envs_gpt/{self.env_name}/{self.idx}"
         self.rl_filepath = f"{self.idx}-{self.ite}.txt"
@@ -670,9 +690,10 @@ class RewardNode(Node):
             "gpt-4v-succ": v_succ,
         }
         data_extra = data.copy()
-        data_extra["gpt-4v-description"] = (description,)
+        data_extra["gpt-4v-description"] = description
         # only caption for best node of succ node
         self._write_record_line(data, self.best_record)
+        self.caption_data = data_extra
         return data_extra
 
     def summarize(self):
@@ -704,11 +725,11 @@ class RewardNode(Node):
                 continue
             elif msg == "":
                 logging.info(
-                    f"Iteration {self.iterations} - node {self.idx}: successfully launched RL training."
+                    f"[Task iter {self.task_ite} - Reward iter {self.reward_ite} - Node {self.idx}]: Successfully launched RL training."
                 )
             else:
                 logging.error(
-                    f"Iteration {self.iterations} - node {self.idx}: execution error!"
+                    f"[Task iter {self.task_ite} - Reward iter {self.reward_ite} - Node {self.idx}]: Execution error!"
                 )
                 self.exec_success = False
                 self.success = DUMMY_FAILURE
@@ -860,6 +881,9 @@ class SuccessNode(Node):
         self.execution_error_feedback = file_to_string(
             f"{self.prompt_dir}/reward/execution_error_feedback.txt"
         )
+        self.gpt4v_tip = file_to_string(
+            f"{self.prompt_dir}/reward/gpt4v_tip.txt"
+        )
         self.code_feedback = file_to_string(
             f"{self.prompt_dir}/reward/code_feedback.txt"
         )
@@ -910,25 +934,26 @@ class SuccessNode(Node):
         behavior_captioner=None,
     ) -> List[RewardNode]:
         self.children: List[RewardNode] = []
-        responses = gpt_call(
+        choices = gpt_call(
             messages=self.messages,
             model=self.model,
             n_samples=self.n_samples,
             temperature=self.temperature,
         )
-        if responses is None:
-            responses = gpt_call(
+        if choices is None:
+            choices = gpt_call(
                 messages=self.messages,
                 model=self.model,
                 n_samples=1,
                 temperature=self.temperature + 0.5,
             )
 
-        if len(responses) == 1:
-            logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
+        if len(choices) == 1:
+            logging.info(f"GPT Output:\n " + choices[0]["message"]["content"] + "\n")
 
-        for response in responses:
-            messages, response, code, no_err, local_num_syntax_error = (
+        for choice in choices:
+            response = choice["message"]
+            messages, response, code, syntax_valid, local_num_syntax_error = (
                 self._loop_until_no_syntax_err(
                     messages=self.messages,
                     response=response,
@@ -939,7 +964,7 @@ class SuccessNode(Node):
                     },
                 )
             )
-            if not no_err:
+            if not syntax_valid:
                 continue
             child = RewardNode(
                 root_dir=self.root_dir,
@@ -991,15 +1016,22 @@ class SuccessNode(Node):
                 child.remove()
         best_reward.unlink()
         self.children = []
+        best_reward.caption()
+        if best_reward.caption_data is not None:
+            gpt4v_description =  best_reward.caption_data['gpt-4v-description'].replace('FAIL', '').replace('SUCCESS','').strip()
+            gpt4v_feedback = self.gpt4v_tip.format(gpt4v_description=gpt4v_description)
+        else:
+            gpt4v_feedback = ''
+
         feedback = self._wrap_user_message(
-            best_reward.summary["content"] + self.code_feedback
+            best_reward.summary["content"] + gpt4v_feedback+ self.code_feedback
         )
         self.messages = [
             *best_reward.messages,
-            best_reward.response["message"],
+            *best_reward.response,
             feedback,
         ]
-        self.response = None
+        self.response = []
 
         # some statistic report
         max_success = best_reward.summary["success"]
@@ -1011,11 +1043,7 @@ class SuccessNode(Node):
             f"Iteration {self.ite}: Max Success: {max_success}, Execute Rate: {execute_rate}, Avg Syntax Error: {avg_syntax_error}"
         )
         logging.info(f"Iteration {self.ite}: Best Generation ID: {best_reward.idx}")
-        logging.info(
-            f"Iteration {self.ite}: GPT Output Content:\n"
-            + best_reward.response["message"]["content"]
-            + "\n"
-        )
+        logging.info(f"Iteration {self.ite}: Conversation:\n" + best_reward.words())
         logging.info(
             f"Iteration {self.ite}: User Content:\n"
             + best_reward.summary["content"]
@@ -1130,24 +1158,25 @@ class TaskNode(Node):
     def propose(
         self, iterations=3, n_samples=3, temperature=0, model="gpt-3.5-turbo"
     ) -> List[SuccessNode]:
-        responses = gpt_call(
+        choices = gpt_call(
             messages=self.messages,
             model=self.model,
             n_samples=self.n_samples,
             temperature=self.temperature,
         )
-        if responses is None:
-            responses = gpt_call(
+        if choices is None:
+            choices = gpt_call(
                 messages=self.messages,
                 model=self.model,
                 n_samples=1,
                 temperature=self.temperature + 0.5,
             )
-        if len(responses) == 1:
-            logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
+        if len(choices) == 1:
+            logging.info(f"GPT Output:\n " + choices[0]["message"]["content"] + "\n")
 
-        for response in responses:
-            messages, response, code, no_err, local_num_syntax_error = (
+        for choice in choices:
+            response = choice["message"]
+            messages, response, code, syntax_valid, local_num_syntax_error = (
                 self._loop_until_no_syntax_err(
                     messages=self.messages,
                     response=response,
@@ -1155,7 +1184,7 @@ class TaskNode(Node):
                     replacements={"@torch.jit.script": ""},
                 )
             )
-            if not no_err:
+            if not syntax_valid:
                 continue
             child: SuccessNode = SuccessNode(
                 root_dir=self.root_dir,
@@ -1185,7 +1214,7 @@ class TaskNode(Node):
         for success_child in children_bak:
             if success_child.best_reward is not None:
                 num_optimized.append(1)
-                caption_data = success_child.best_reward.caption()
+                caption_data = success_child.best_reward.caption_data
                 f_succ = int(success_child.best_reward.summary["success"] > 0)
                 num_f_succ.append(f_succ)
                 video_path = caption_data["video_path"]
@@ -1568,17 +1597,17 @@ class EnvNode(Node):
 
     def _propose(self, temperature_increase=0) -> List[TaskNode]:
         messages = self.messages
-        responses = gpt_call(
+        choices = gpt_call(
             messages=messages,
             model=self.model,
             n_samples=1,
             temperature=self.temperature + temperature_increase,
         )
         if self.n_samples == 1:
-            logging.info(f"GPT Output:\n " + responses[0]["message"]["content"] + "\n")
+            logging.info(f"GPT Output:\n " + choices[0]["message"]["content"] + "\n")
         pattern = r"([Tt]ask\s+\d+:.*)"
-        msg = responses[0]["message"]
-        tasks = re.findall(pattern, msg["content"])
+        response = choices[0]["message"]
+        tasks = re.findall(pattern, response["content"])
         codes = None
         if len(tasks) > 0:
             codes = [
@@ -1590,7 +1619,7 @@ class EnvNode(Node):
                 )
                 for task in tasks
             ]
-        return msg, codes
+        return response, codes
 
     def _update_self_with_node(self, node):
         super()._update_self_with_node(node)
