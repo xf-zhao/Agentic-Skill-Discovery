@@ -1018,7 +1018,7 @@ class SuccessNode(Node):
         self.children = []
         best_reward.caption()
         if best_reward.caption_data is not None:
-            gpt4v_description =  best_reward.caption_data['gpt-4v-description'].replace('FAIL', '').replace('SUCCESS','').strip()
+            gpt4v_description =  best_reward.caption_data['gpt-4v-description']
             gpt4v_feedback = self.gpt4v_tip.format(gpt4v_description=gpt4v_description)
         else:
             gpt4v_feedback = ''

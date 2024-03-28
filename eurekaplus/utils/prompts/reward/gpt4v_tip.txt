@@ -1,1 +1,5 @@
-Here is the output from GPT-4v when describing the trained behavior: {gpt4v_description}
+
+Here is the output from GPT-4v when describing the trained behavior:
+```GPT-4v-Caption
+{gpt4v_description}
+```
