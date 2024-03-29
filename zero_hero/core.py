@@ -161,8 +161,7 @@ def gpt_call(
                 err_msg = f"Attempt {attempt+1} failed with error: {e}"
                 logging.info(err_msg)
                 if "maximum context length" in err_msg:
-                    choices = None
-                    return
+                    return []
                 time.sleep(1)
         if response_cur is None:
             logging.info("Code terminated due to too many failed attempts!")
@@ -383,16 +382,16 @@ class Node:
                         n_samples=1,
                         temperature=self.temperature + t * 0.1,
                     )
-                    if choices is None:
+                    if choices is None or len(choices) == 0:
                         gpt_err = True
                         break
                     else:
                         gpt_err = False
-                        response.extend(choices[0]["message"])
+                        response.append(choices[0]["message"])
                 code = extract_code_string(responses=response, combine_all=True)
                 syntax_valid, err_feedback = self._syntax_examine(code)
                 if not syntax_valid:
-                    response.extend(self._wrap_user_message(err_feedback))
+                    response.append(self._wrap_user_message(err_feedback))
                     self.num_syntax_error += 1
                     local_num_syntax_error += 1
                 else:
@@ -881,9 +880,7 @@ class SuccessNode(Node):
         self.execution_error_feedback = file_to_string(
             f"{self.prompt_dir}/reward/execution_error_feedback.txt"
         )
-        self.gpt4v_tip = file_to_string(
-            f"{self.prompt_dir}/reward/gpt4v_tip.txt"
-        )
+        self.gpt4v_tip = file_to_string(f"{self.prompt_dir}/reward/gpt4v_tip.txt")
         self.code_feedback = file_to_string(
             f"{self.prompt_dir}/reward/code_feedback.txt"
         )
@@ -1018,13 +1015,13 @@ class SuccessNode(Node):
         self.children = []
         best_reward.caption()
         if best_reward.caption_data is not None:
-            gpt4v_description =  best_reward.caption_data['gpt-4v-description']
+            gpt4v_description = best_reward.caption_data["gpt-4v-description"]
             gpt4v_feedback = self.gpt4v_tip.format(gpt4v_description=gpt4v_description)
         else:
-            gpt4v_feedback = ''
+            gpt4v_feedback = ""
 
         feedback = self._wrap_user_message(
-            best_reward.summary["content"] + gpt4v_feedback+ self.code_feedback
+            best_reward.summary["content"] + gpt4v_feedback + self.code_feedback
         )
         self.messages = [
             *best_reward.messages,
