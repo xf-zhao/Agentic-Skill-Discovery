@@ -106,9 +106,9 @@ def main(cfg):
 
     if task_node.num_variants > 0:
         task_status = "completed"
-        variants = task_node.variants[0]
+        variants = task_node.variants
         logging.info(
-            f"Collected new skill {task} with {task_node.num_variants} variants: {variants}."
+            f"Collected new skill {task} with {task_node.num_variants} variants: {variants[0]}."
         )
     else:
         if task_node.num_candidates > 0:
@@ -118,9 +118,9 @@ def main(cfg):
         else:
             task_status = "failed"
             logging.info(f"Mission impossible on {task}.")
-            variants = ""
+            variants = [""]
     tdb.load()
-    tdb.update_task({"command": task, "status": task_status, "variants": variants})
+    tdb.update_task({"command": task, "status": task_status, "variants": variants[0]})
     tdb.render()
     logging.info(f"Done! for task: {task}.")
 

@@ -22,3 +22,11 @@ cd zero-hero
 pip3 install -r requirements.txt
 
 ```
+
+
+# Minimal Training Scripts
+
+## The `learn.py` to learn a single task with LLM+RL.
+```bash
+python3 learn.py task="Reach cube A." num_envs=2048 memory_requirement=8 min_gpu_mem=8 temperature=0.7
+```

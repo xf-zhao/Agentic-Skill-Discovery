@@ -1048,10 +1048,10 @@ class SuccessNode(Node):
         )
         if self.best_reward is not None:
             best_reward.priors = [*self.best_reward.priors, self.best_reward.idx]
-        # Update the best Eureka Output
         if max_success > self.stats["max_success_overall"]:
             self.stats["max_success_overall"] = max_success
-            self.best_reward = best_reward
+        # Update the best but not like Eureka
+        self.best_reward = best_reward
 
         stat = {
             "syntax_error": avg_syntax_error,
