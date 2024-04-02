@@ -107,14 +107,14 @@ def main(cfg):
 
     if task_node.num_variants > 0:
         task_status = "completed"
-        variants = task_node.variants
+        variants = [v.idx for v in task_node.variants]
         logging.info(
-            f"Collected new skill {task} with {task_node.num_variants} variants: {variants[0]}."
+            f"Collected new skill {task} with {task_node.num_variants} variants: {variants}."
         )
     else:
         if task_node.num_candidates > 0:
             task_status = "compromised"
-            variants = task_node.candidates
+            variants = [c.idx for c in task_node.candidates]
             logging.info(f"Mission compromised on {task} with candidates: {variants}.")
         else:
             task_status = "failed"
