@@ -1,4 +1,5 @@
 import time
+import re
 import os
 import pandas as pd
 
@@ -28,6 +29,7 @@ class TaskDatabase(Database):
             failed_tolerance if failed_tolerance is not None else target_num_skills * 2
         )
         self.proposal_batch = proposal_batch
+        self.columns = ["command", "status", "variants"]
         self.load()
 
     def met_target(self):
@@ -40,14 +42,19 @@ class TaskDatabase(Database):
     def should_wait(self):
         return self.num_wait >= self.proposal_batch
 
+    def reset_tasks(self, tasks):
+        df = pd.DataFrame(columns=self.columns)
+        self.df = df
+        self.add_tasks(tasks)
+        return self
+
     def load(self):
         store_path = self.store_path
-        columns = ["command", "status", "variants"]
         if os.path.exists(store_path):
             df = pd.read_csv(store_path)
         else:
             os.makedirs(os.path.dirname(store_path), exist_ok=True)
-            df = pd.DataFrame(columns=columns)
+            df = pd.DataFrame(columns=self.columns)
         self.df = df
         return self
 
@@ -94,8 +101,19 @@ class TaskDatabase(Database):
             self.add_task(task)
         return
 
+    def drop_tasks(self, task_indicates, reduce=1):
+        df = self.df
+        indices_to_drop = []
+        for task_indicate in task_indicates:
+            index_to_drop = re.search(pattern=r"Task\s+(\d+)", string=task_indicate).group(1)
+            index = int(index_to_drop) - reduce
+            indices_to_drop.append(index)
+        df = df.drop(index=indices_to_drop).reset_index(drop=True)
+        self.df = df
+        return
+
     def update_task(self, task: dict):
-        command = task['command']
+        command = task["command"]
         if command not in self.df["command"].values:
             self.add_task(command)
         df = self.df
@@ -111,17 +129,25 @@ class TaskDatabase(Database):
 
     def save(self):
         self.df.to_csv(self.store_path, index=False)
-        print(f'self.df:\n {self.df}')
-        print(f'Saved data to {self.store_path}')
+        print(f"self.df:\n {self.df}")
+        print(f"Saved data to {self.store_path}")
 
-    def render(self):
+    def render(self, pure=False):
         df = self.df
-        numbered_tasks = "\n".join(
-            [
-                f"({i+1}) Task: {row.command.rstrip('.')}. Status: {row.status}. Variants: {row.variants}"
-                for i, row in df.iterrows()
-            ]
-        )
+        if not pure:
+            numbered_tasks = "\n".join(
+                [
+                    f"({i+1}) Task: {row.command} Status: {row.status}. Variants: {row.variants}"
+                    for i, row in df.iterrows()
+                ]
+            )
+        else:
+            numbered_tasks = "\n".join(
+                [
+                    f"({i+1}) Task: {row.command} Status: {row.status}."
+                    for i, row in df.iterrows()
+                ]
+            )
         print(numbered_tasks)
         return numbered_tasks
 

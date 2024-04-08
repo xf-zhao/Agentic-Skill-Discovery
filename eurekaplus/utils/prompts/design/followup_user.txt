@@ -1,0 +1,1 @@
+So, the tasks to filter out are listed as (answer with task id / index as a list "[Task i, Task j, ...]" for the i, j, ... task):

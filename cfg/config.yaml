@@ -20,6 +20,11 @@ proposal:
   target_num_skills: 64
   failed_tolerance: 256
   proposal_batch: 10
+design:
+  model: gpt-4-0125-preview
+  temperature: 0
+  seeds:
+    - 0
 debug: False
 headless: True
 max_iterations: 1500 # RL Policy training iterations (decrease this to make the feedback loop faster)

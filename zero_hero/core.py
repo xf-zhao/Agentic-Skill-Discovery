@@ -110,6 +110,22 @@ class RewardsCfg:
 """
 
 
+def extract_tasks(content, pattern=r"([Tt]ask(\s+\d+)?:.*)"):
+    tasks = re.findall(pattern, content)
+    codes = None
+    if len(tasks) > 0:
+        codes = [
+            (
+                task.split(": ")[-1]
+                .replace("specific", "target")
+                .replace("specified", "target")
+                .replace("target target", "target")
+            )
+            for task, __ in tasks
+        ]
+    return codes
+
+
 def _wrap_message(content, role="user"):
     return {"role": role, "content": content}
 
@@ -190,8 +206,8 @@ def extract_code_string(responses, combine_all=False, log=False):
     for resp in responses:
         content += resp["content"]
     # Regex patterns to extract python code enclosed in GPT response
-    code_string = ""
     for pattern in patterns:
+        code_string = ""
         code_strings = re.findall(pattern, content, re.DOTALL)
         if len(code_strings) > 0:
             if combine_all:
@@ -1602,20 +1618,8 @@ class EnvNode(Node):
         )
         if self.n_samples == 1:
             logging.info(f"GPT Output:\n " + choices[0]["message"]["content"] + "\n")
-        pattern = r"([Tt]ask\s+\d+:.*)"
         response = choices[0]["message"]
-        tasks = re.findall(pattern, response["content"])
-        codes = None
-        if len(tasks) > 0:
-            codes = [
-                (
-                    task.split(": ")[-1]
-                    .replace("specific", "target")
-                    .replace("specified", "target")
-                    .replace("target target", "target")
-                )
-                for task in tasks
-            ]
+        codes = extract_tasks(response["content"])
         return response, codes
 
     def _update_self_with_node(self, node):
