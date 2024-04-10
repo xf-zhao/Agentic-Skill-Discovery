@@ -49,10 +49,11 @@ class CenteralizedTask:
     def consume(self, task_database: TaskDatabase):
         tdb = self.center_tasks
         df = pd.concat([tdb.df, task_database.df]).reset_index(drop=True)
-        self.df = df
+        tdb.df = df
         logging.info(
             f"Updated centralized task database {tdb.store_path} with {len(task_database.df)} new tasks."
         )
+        tdb.save()
         return self
 
     def filter(self, task_database: TaskDatabase):
