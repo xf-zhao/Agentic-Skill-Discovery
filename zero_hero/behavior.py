@@ -89,9 +89,9 @@ class BehaviorCaptioner:
         return description
 
     def conclude(self, playbacks: dict, task: str = ""):
-        if playbacks["image_paths"] is None:
+        if playbacks is None or playbacks["image_paths"] is None:
             logging.warning(f"No behavior images to describe.")
-            return
+            return None, False
         description = self.describe(playbacks, task=task)
         if "SUCCESS" in description:
             succ = True

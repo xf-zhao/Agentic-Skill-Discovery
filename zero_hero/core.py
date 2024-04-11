@@ -836,10 +836,10 @@ class RewardNode(Node):
             if not os.path.exists(best_record_dir):
                 os.makedirs(best_record_dir)
         # For gpt-4-v
-        self.data_extra = None
+        self.caption_data = None
 
     def init(self):
-        self.data_extra = None
+        self.caption_data = None
         super().init()
         cur_env_dir = f"{self.root_dir}/envs_gpt/{self.env_name}/{self.idx}"
         self.rl_filepath = f"{self.idx}-{self.ite}.txt"
@@ -968,11 +968,16 @@ class RewardNode(Node):
 
     def caption(self):
         assert self.behavior_captioner is not None
-        if self.playbacks is None:
-            self.playbacks = self.play()
+        for i in range(3):
+            if self.playbacks is None:
+                self.playbacks = self.play()
+            if i > 0:
+                logging.warning(f"Tried but failed to record playbacks {i}-th times.")
         description, v_succ = self.behavior_captioner.conclude(
             playbacks=self.playbacks, task=self.task
         )
+        if description is None:
+            return
         data = {
             **self.playbacks,
             "gpt-4v-succ": v_succ,
@@ -1500,12 +1505,15 @@ class TaskNode(Node):
         for success_child in children_bak:
             if success_child.best_reward is not None:
                 num_optimized.append(1)
-                caption_data = success_child.best_reward.caption_data
                 f_succ = int(success_child.best_reward.summary["success"] > 0)
                 num_f_succ.append(f_succ)
-                video_path = caption_data["video_path"]
-                v_succ = caption_data["gpt-4v-succ"]
-                video_caption = caption_data["gpt-4v-description"]
+                caption_data = success_child.best_reward.caption_data
+                if caption_data is not None:
+                    v_succ = caption_data["gpt-4v-succ"]
+                    video_path = caption_data["video_path"]
+                    video_caption = caption_data["gpt-4v-description"]
+                else:
+                    v_succ, video_path, video_caption = False, None, None
                 if v_succ:
                     num_v_succ.append(1)
                 else:
