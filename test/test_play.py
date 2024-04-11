@@ -12,7 +12,7 @@ rn = RewardNode(
 playbacks = rn.play()
 
 bc = BehaviorCaptioner(
-    init_sys_prompt="/data/xufeng/workspace/zero_hero/eurekaplus/utils/prompts/task/behavior_context.txt"
+    init_sys_prompt="/data/xufeng/workspace/zero_hero/evolution/utils/prompts/task/behavior_context.txt"
 )
 
 msg = bc.conclude(
@@ -21,7 +21,7 @@ msg = bc.conclude(
 )
 
 bc2 = BehaviorCaptioner(
-    init_sys_prompt="/data/xufeng/workspace/zero_hero/eurekaplus/utils/prompts/task/behavior_context.txt",
+    init_sys_prompt="/data/xufeng/workspace/zero_hero/evolution/utils/prompts/task/behavior_context.txt",
     caption_output="caption2.txt",
 )
 msg2 = bc2.conclude(

@@ -1,4 +1,4 @@
-You are a task manager trying to manage candidate tasks by filtering out duplicated tasks or too complicated tasks which are almost impossible to complete at one time.
+You are a task manager trying to manage candidate tasks by filtering out duplicated tasks (focus more on the outcome status instead of the way of achieving certain result) or too complicated tasks which are almost impossible to complete at one time.
 1. The environment is always set according to the Python source code.
 ```python
 {source_code}

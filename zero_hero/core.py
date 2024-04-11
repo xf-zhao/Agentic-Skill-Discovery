@@ -15,11 +15,10 @@ import time
 import uuid
 import tempfile
 from typing import List
-from eurekaplus.utils.misc import *
-from eurekaplus.utils.file_utils import load_tensorboard_logs
-from eurekaplus.utils.extract_task_code import *
+from evolution.utils.misc import *
+from evolution.utils.file_utils import load_tensorboard_logs
+from evolution.utils.extract_task_code import *
 from .behavior import BehaviorCaptioner, video_to_frames
-from .task import TaskDatabase
 
 
 DUMMY_FAILURE = -10000.0
@@ -120,6 +119,7 @@ def extract_tasks(content, pattern=r"([Tt]ask(\s+\d+)?:.*)"):
                 .replace("specific", "target")
                 .replace("specified", "target")
                 .replace("target target", "target")
+                .replace("**", "")
             )
             for task, __ in tasks
         ]
@@ -226,6 +226,279 @@ def extract_code_string(responses, combine_all=False, log=False):
     return code_string
 
 
+class Database:
+    def get_attr(self, attr, index=None, task=None):
+        if index is not None:
+            variants = self.df.loc[index][attr]
+        elif task is not None:
+            variants = self.df[self.df["command"] == task][attr]
+        else:
+            raise NotImplementedError
+        return variants.values
+
+
+class TaskDatabase(Database):
+    def __init__(
+        self,
+        env_name,
+        env_idx,
+        store_path=None,
+        target_num_skills=64,
+        failed_tolerance=None,
+        proposal_batch=10,
+    ) -> None:
+        self.store_path = (
+            f'{ZEROHERO_ROOT_DIR}/envs_gpt/tasks/{env_name.replace(" ","_")}_{env_idx}.csv'
+            if store_path is None
+            else store_path
+        )
+        self.target_num_skills = target_num_skills
+        self.failed_tolerance = (
+            failed_tolerance if failed_tolerance is not None else target_num_skills * 2
+        )
+        self.proposal_batch = proposal_batch
+        self.columns = ["command", "status", "variants"]
+        self.load()
+
+    def met_target(self):
+        is_met = (
+            self.num_skills >= self.target_num_skills
+            or self.num_failed >= self.failed_tolerance
+        )
+        return is_met
+
+    def should_wait(self):
+        return self.num_wait >= self.proposal_batch
+
+    def reset_tasks(self, tasks):
+        df = pd.DataFrame(columns=self.columns)
+        self.df = df
+        self.add_tasks(tasks)
+        return self
+
+    def load(self):
+        store_path = self.store_path
+        if os.path.exists(store_path):
+            df = pd.read_csv(store_path)
+        else:
+            os.makedirs(os.path.dirname(store_path), exist_ok=True)
+            df = pd.DataFrame(columns=self.columns)
+        self.df = df
+        return self
+
+    @property
+    def commands(self):
+        return self.df["commands"]
+
+    @property
+    def status(self):
+        return self.df["status"]
+
+    @property
+    def variants(self):
+        return self.df["variants"]
+
+    @property
+    def num_wait(self):
+        return (self.df["status"] == "todo").sum() + (
+            self.df["status"] == "doing"
+        ).sum()
+
+    @property
+    def num_skills(self):
+        return (self.df["status"] == "completed").sum()
+
+    @property
+    def num_failed(self):
+        return (self.df["status"] == "failed").sum()
+
+    def add_task(self, task: str):
+        df = self.df
+        if task in self.df["command"].values:
+            self.refresh_task(task)
+        else:
+            row = pd.Series({"command": task, "status": "todo", "variants": ""})
+            df = pd.concat([df, pd.DataFrame([row], columns=row.index)]).reset_index(
+                drop=True
+            )
+            self.df = df
+        return
+
+    def add_tasks(self, tasks):
+        for task in tasks:
+            self.add_task(task)
+        return
+
+    def drop_tasks(self, task_indicates, reduce=1):
+        df = self.df
+        indices_to_drop = []
+        for task_indicate in task_indicates:
+            index_to_drop = re.search(
+                pattern=r"Task\s+(\d+)", string=task_indicate
+            ).group(1)
+            index = int(index_to_drop) - reduce
+            indices_to_drop.append(index)
+        df = df.drop(index=indices_to_drop).reset_index(drop=True)
+        self.df = df
+        return
+
+    def update_task(self, task: dict):
+        command = task["command"]
+        if command not in self.df["command"].values:
+            self.add_task(command)
+        df = self.df
+        df.loc[df.command == command, "status"] = task["status"]
+        df.loc[df.command == command, "variants"] = task["variants"]
+        self.df = df
+        self.save()
+        return
+
+    def refresh_task(self, task: str):
+        self.update_task({"command": task, "status": "todo", "variants": ""})
+        return
+
+    def save(self):
+        self.df.to_csv(self.store_path, index=False)
+        print(f"self.df:\n {self.df}")
+        print(f"Saved data to {self.store_path}")
+
+    def render(self, pure=False):
+        df = self.df
+        if not pure:
+            numbered_tasks = "\n".join(
+                [
+                    f"({i+1}) Task: {row.command} Status: {row.status}. Variants: {row.variants}"
+                    for i, row in df.iterrows()
+                ]
+            )
+        else:
+            numbered_tasks = "\n".join(
+                [
+                    f"({i+1}) Task: {row.command} Status: {row.status}."
+                    for i, row in df.iterrows()
+                ]
+            )
+        numbered_tasks += "\n"
+        print(numbered_tasks)
+        return numbered_tasks
+
+    def pop_wait(self, timeout=60 * 60 * 10):
+        itime = 0
+        while task is None and itime < timeout:
+            itime += 1
+            time.sleep(1)
+            task = self.pop()
+            if task is not None:
+                break
+        return task
+
+    def pop(self):
+        df = self.df
+        indices = df.loc[df.status == "todo"].index
+        if len(indices) > 0:
+            index_to_pop = indices[0]
+            df.loc[index_to_pop, "status"] = "doing"
+            task = df.loc[index_to_pop, "command"]
+            self.df = df
+            self.save()
+        else:
+            task = None
+        return task
+
+    @property
+    def skills(self):
+        df = self.df
+        skill_df = df[df["status"] == "completed"]
+        return skill_df
+
+
+class CenteralizedTask:
+    def __init__(
+        self,
+        env_name,
+        store_path=None,
+        model="gpt-3.5-turbo-0125",
+        temperature=0.7,
+    ) -> None:
+        self.env_name = env_name
+        self.root_dir = ZEROHERO_ROOT_DIR
+        self.prompt_dir = f"{self.root_dir}/evolution/utils/prompts"
+        self.center_tasks = TaskDatabase(
+            env_name=env_name, env_idx="centralized_task", store_path=store_path
+        ).load()
+        self.messages = []
+        self.env_obs_file = (
+            f"{self.root_dir}/envs/{self.env_name}/env_cfg/observation.py"
+        )
+        self.initial_system = file_to_string(
+            f"{self.prompt_dir}/design/initial_system.txt"
+        )
+        self.initial_user = file_to_string(f"{self.prompt_dir}/design/initial_user.txt")
+        self.followup_user = file_to_string(
+            f"{self.prompt_dir}/design/followup_user.txt"
+        )
+        self.model = model
+        self.temperature = temperature
+
+    def consume(self, task_database: TaskDatabase):
+        tdb = self.center_tasks
+        df = pd.concat([tdb.df, task_database.df]).reset_index(drop=True)
+        tdb.df = df
+        logging.info(
+            f"Updated centralized task database {tdb.store_path} with {len(task_database.df)} new tasks."
+        )
+        tdb.save()
+        return self
+
+    def filter(self, task_database: TaskDatabase):
+        tdb = self.center_tasks
+        tasks_rm = self._filter(task_database)
+        if tasks_rm is not None:
+            task_database.drop_tasks(tasks_rm)
+            task_database.render()
+            task_database.save()
+            logging.info(
+                f"Rm {len(tasks_rm)} tasks for task database {task_database.store_path}."
+            )
+        else:
+            logging.info(f"No duplicates for database {tdb.store_path}.")
+        self.consume(task_database)
+        return task_database
+
+    def _filter(self, task_database):
+        tdb = self.center_tasks
+        env_obs_code_string = file_to_string(self.env_obs_file)
+        initial_system = self.initial_system.format(
+            known_tasks=tdb.render(), source_code=env_obs_code_string
+        )
+        initial_user = self.initial_user.format(
+            coming_tasks=task_database.render(pure=True)
+        )
+        followup_user = self.followup_user
+        messages = [
+            wrap_system_message(initial_system),
+            wrap_user_message(initial_user),
+        ]
+        init_resp = self._gpt_call(messages)
+        print(init_resp["content"])
+        messages.extend([init_resp, wrap_user_message(followup_user)])
+        resp = self._gpt_call(messages)
+        print(resp["content"])
+        filtered_tasks = extract_tasks(resp["content"], pattern=r"(Task(\s+\d+)).*")
+        self.messages = messages
+        return filtered_tasks
+
+    def _gpt_call(self, messages):
+        choices = gpt_call(
+            messages=messages,
+            model=self.model,
+            n_samples=1,
+            temperature=self.temperature,
+        )
+        resp = choices[0]["message"]
+        return resp
+
+
 class Node:
     def __init__(
         self,
@@ -250,7 +523,7 @@ class Node:
     ) -> None:
         self.resume = resume
         self.root_dir = root_dir if root_dir is not None else ZEROHERO_ROOT_DIR
-        self.prompt_dir = f"{self.root_dir}/eurekaplus/utils/prompts"
+        self.prompt_dir = f"{self.root_dir}/evolution/utils/prompts"
         self.env_name = env_name
         self.precedents = precedents
         self.type = type
@@ -1387,11 +1660,13 @@ class EnvNode(Node):
         impossibles=None,
         graph_output=None,
         status_output=None,
+        centralized_task: CenteralizedTask = None,
         *args,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.task_database = task_database
+        self.centralized_task = centralized_task
         self.idx = idx
         self.G = nx.DiGraph()
         self.type = "Env"
@@ -1400,6 +1675,7 @@ class EnvNode(Node):
             f"{self.prompt_dir}/task/initial_system.txt"
         )
         self.initial_user = file_to_string(f"{self.prompt_dir}/task/initial_user.txt")
+        self.followup_user = file_to_string(f"{self.prompt_dir}/task/followup_user.txt")
         self.signature = file_to_string(f"{self.prompt_dir}/success/signature.txt")
         self.code_output_tip = file_to_string(
             f"{self.prompt_dir}/task/code_output_tip.txt"
@@ -1443,8 +1719,14 @@ class EnvNode(Node):
     def init(self):
         super().init()
         tasks_list = self.task_database.render()
+        task_prompt = f"Recently known tasks are:\n{tasks_list}\n"
+        if self.centralized_task is not None:
+            centeral_task_list = self.centralized_task.center_tasks.render()
+            task_prompt = (
+                f"Previously known tasks are:\n{centeral_task_list}\n" + task_prompt
+            )
         initial_system = (
-            self.initial_system.format(tasks=tasks_list) + self.code_output_tip
+            self.initial_system.format(tasks=task_prompt) + self.code_output_tip
         )
         initial_user = self.initial_user.format(
             env_obs_code_string=self.env_obs_code,
@@ -1608,8 +1890,7 @@ class EnvNode(Node):
             print(msg["content"])
         return
 
-    def _propose(self, temperature_increase=0) -> List[TaskNode]:
-        messages = self.messages
+    def _gpt_call(self, messages, temperature_increase=0):
         choices = gpt_call(
             messages=messages,
             model=self.model,
@@ -1618,9 +1899,17 @@ class EnvNode(Node):
         )
         if self.n_samples == 1:
             logging.info(f"GPT Output:\n " + choices[0]["message"]["content"] + "\n")
-        response = choices[0]["message"]
-        codes = extract_tasks(response["content"])
-        return response, codes
+        resp = choices[0]["message"]
+        return resp
+
+    def _propose(self, temperature_increase=0) -> List[TaskNode]:
+        messages = self.messages
+        init_resp = self._gpt_call(messages, temperature_increase=temperature_increase)
+        messages.extend([init_resp, wrap_user_message(self.followup_user)])
+        resp = self._gpt_call(messages, temperature_increase=temperature_increase)
+        codes = extract_tasks(resp["content"])
+        self.messages = messages
+        return resp, codes
 
     def _update_self_with_node(self, node):
         super()._update_self_with_node(node)

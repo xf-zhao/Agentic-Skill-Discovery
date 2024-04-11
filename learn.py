@@ -5,11 +5,10 @@ import os
 import openai
 from omegaconf import OmegaConf
 from pathlib import Path
-from eurekaplus.utils.misc import *
-from eurekaplus.utils.extract_task_code import *
+from evolution.utils.misc import *
+from evolution.utils.extract_task_code import *
 from zero_hero.behavior import BehaviorCaptioner
-from zero_hero.core import TaskNode, ZEROHERO_ROOT_DIR
-from zero_hero.task import TaskDatabase
+from zero_hero.core import TaskNode, TaskDatabase
 
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")
@@ -24,7 +23,8 @@ def main(cfg):
     seed = 99 if specified_task else cfg.seed
     env_idx = f"E{seed:02d}"
     tdb = TaskDatabase(
-        store_path=f'{ZEROHERO_ROOT_DIR}/envs_gpt/tasks/{env_name.replace(" ","_")}_{env_idx}.csv'
+        env_name=env_name,
+        env_idx=env_idx,
     )
     if specified_task:
         tdb.add_task(task)

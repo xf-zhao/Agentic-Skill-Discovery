@@ -1,0 +1,1 @@
+Collect the new proposals and make a pure task list starting with `Task {num}: {instruction}`, where `num` is the task order.

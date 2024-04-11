@@ -2,8 +2,7 @@ import hydra
 import logging
 import os
 import openai
-from zero_hero.core import EnvNode, ZEROHERO_ROOT_DIR
-from zero_hero.task import TaskDatabase
+from zero_hero.core import EnvNode, TaskDatabase, CenteralizedTask
 
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")
@@ -13,15 +12,21 @@ def main(cfg):
     env_name = cfg.env.env_name.lower()
     env_idx = f"E{cfg.seed:02d}"
     tdb = TaskDatabase(
-        store_path=f'{ZEROHERO_ROOT_DIR}/envs_gpt/tasks/{env_name.replace(" ","_")}_{env_idx}.csv',
+        env_name=env_name,
+        env_idx=env_idx,
         target_num_skills=cfg.proposal.target_num_skills,
         failed_tolerance=cfg.proposal.failed_tolerance,
         proposal_batch=cfg.proposal.proposal_batch,
     )
+    ct = CenteralizedTask(
+        env_name=env_name,
+        model=cfg.design.model,
+        temperature=cfg.design.temperature,
+    )
     env_node = EnvNode(
         task_database=tdb,
+        centralized_task=ct,
         idx=env_idx,
-        root_dir=ZEROHERO_ROOT_DIR,
         env_name=env_name,
         resume=cfg.resume,
         model=model,

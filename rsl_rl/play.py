@@ -71,7 +71,7 @@ parser.add_argument(
 
 dirname = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, dirname)
-from eurekaplus.utils.misc import set_freest_gpu
+from evolution.utils.misc import set_freest_gpu
 
 set_freest_gpu()
 

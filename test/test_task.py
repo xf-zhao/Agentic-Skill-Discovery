@@ -3,7 +3,7 @@ import os, sys
 dirname = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, dirname)
 
-from zero_hero.task import TaskDatabase
+from zero_hero.core import TaskDatabase
 
 skill = {}
 
