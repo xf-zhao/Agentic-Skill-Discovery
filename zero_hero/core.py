@@ -842,7 +842,7 @@ class RewardNode(Node):
         self.caption_data = None
         super().init()
         cur_env_dir = f"{self.root_dir}/envs_gpt/{self.env_name}/{self.idx}"
-        self.rl_filepath = f"{self.idx}-{self.ite}.txt"
+        self.rl_filepath = f"{self.idx}.txt"
         if self.parent is not None:
             self.success_idx = self.parent.idx
         self.cur_env_dir = cur_env_dir
