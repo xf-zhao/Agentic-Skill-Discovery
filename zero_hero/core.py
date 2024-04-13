@@ -1045,19 +1045,19 @@ class RewardNode(Node):
         return data
 
     def _block_until_play_recorded(self):
-        self.play_run.communicate(timeout=60 * 60 * 1)
+        self.play_run.communicate()
         pattern = r".*(Loading model checkpoint from.*)"
         play_log = file_to_string(self.play_filepath)
         model_path_reg = re.search(pattern=pattern, string=play_log)
         if model_path_reg is None:
-            return None, None
+            return
         video_dir = (
             model_path_reg.group(1).split(":")[1].strip().replace(".pt", "_videos")
         )
         video_path = f"{video_dir}/rl-video-step-0.mp4"
         obs_path = f"{video_dir}/rl-video-step-0-obs.json"
         if not os.path.exists(video_path):
-            return None
+            return
         image_paths = video_to_frames(video_path)
         playbacks = {
             "reward_idx": self.idx,
