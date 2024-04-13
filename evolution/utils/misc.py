@@ -20,7 +20,6 @@ def get_freest_util_gpu():
     sp = subprocess.Popen(['gpustat', '--json'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out_str, _ = sp.communicate()
     gpustats = json.loads(out_str.decode('utf-8'))
-    # Find GPU with most free memory
     freest_gpu = max(gpustats['gpus'], key=lambda x: 100 - x['utilization.gpu'])
     gpu_util_avi = (100 - freest_gpu['utilization.gpu']) # * 100 %
     return freest_gpu['index'], gpu_util_avi

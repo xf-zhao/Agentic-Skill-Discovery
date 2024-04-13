@@ -87,7 +87,6 @@ def main(cfg):
                 )
                 for node in reward_nodes:
                     node.run()
-            for success_node in success_nodes:
                 _, succ_stat = success_node.collect()
                 wandbrun.log(
                     {
