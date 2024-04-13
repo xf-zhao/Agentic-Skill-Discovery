@@ -784,7 +784,7 @@ class RewardNode(Node):
         headless=False,
         video=False,
         memory_requirement=16,
-        min_gpu_mem=16,
+        min_gpu=90,
         max_iterations=2000,
         priors=None,
         record=None,
@@ -811,7 +811,7 @@ class RewardNode(Node):
         self.rl_filepath = None
         self.play_filepath = None
         self.memory_requirement = memory_requirement
-        self.min_gpu_mem = min_gpu_mem
+        self.min_gpu = min_gpu
         self.policy_feedback = file_to_string(
             f"{self.prompt_dir}/reward/policy_feedback.txt"
         )
@@ -886,25 +886,24 @@ class RewardNode(Node):
     def _prepare_launch(self):
         # Only run when memory is enough
         # Maximum 24 hour waiting time, long enough for finishing one run
-        max_waiting = 60 * 60 * 24 // 10
+        max_waiting = 60 * 12 # mins, so here 12h
         for i in range(max_waiting):
             available_mem = psutil.virtual_memory().available / 1024 / 1024 / 1024
             is_enough = (
                 available_mem > self.memory_requirement
             )  # 16 GB is the minimum mem for a new instance
             # Find the freest GPU to run GPU-accelerated RL
-            gpu_mem_avi = set_freest_gpu()
-            is_valid = gpu_mem_avi >= self.min_gpu_mem
+            gpu_avi = set_freest_gpu()
+            is_valid = gpu_avi >= self.min_gpu
             if is_enough and is_valid:
                 break
             else:
-                if i % 60 == 0:
+                if i % 10 == 0:
                     logging.info(
-                        f"Available RAM: {available_mem} (require {self.memory_requirement}); Available GPU mem: {gpu_mem_avi} (require {self.min_gpu_mem}). Waiting for enough resouces to run node {self.idx}. Time elapsed: {i//6} minutes."
+                        f"Available RAM: {available_mem} (require {self.memory_requirement}); Available GPU: {gpu_avi} (require {self.min_gpu}). Waiting for enough resouces to run node {self.idx}. Time elapsed: {i} minutes."
                     )
-                time.sleep(10)
+                time.sleep(60)
         assert i < max_waiting - 1
-
         return
 
     def run(self):
@@ -1219,7 +1218,7 @@ class SuccessNode(Node):
         headless=False,
         video=False,
         memory_requirement=16,
-        min_gpu_mem=16,
+        min_gpu=90,
         task_ite=1,
         reward_ite=1,
         behavior_captioner=None,
@@ -1268,7 +1267,7 @@ class SuccessNode(Node):
                 headless=headless,
                 video=video,
                 memory_requirement=memory_requirement,
-                min_gpu_mem=min_gpu_mem,
+                min_gpu=min_gpu,
                 task_ite=task_ite,
                 reward_ite=reward_ite,
                 behavior_captioner=behavior_captioner,

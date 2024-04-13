@@ -36,7 +36,7 @@ reward_node:
   precedents: null
   num_envs: 2048
   memory_requirement: 12
-  min_gpu_mem: 12
+  min_gpu: 90
   max_iterations: 1500 # RL Policy training iterations (decrease this to make the feedback loop faster)
   headless: True
   video: False

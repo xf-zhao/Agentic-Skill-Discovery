@@ -79,7 +79,7 @@ def main(cfg):
                     headless=cfg.headless,
                     video=cfg.video,
                     memory_requirement=cfg.memory_requirement,
-                    min_gpu_mem=cfg.min_gpu_mem,
+                    min_gpu=cfg.min_gpu,
                     max_iterations=cfg.max_iterations,
                     task_ite=task_ite,
                     reward_ite=reward_ite,
