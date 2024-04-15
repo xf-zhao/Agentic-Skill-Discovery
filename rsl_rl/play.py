@@ -71,9 +71,9 @@ parser.add_argument(
 
 dirname = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, dirname)
-from evolution.utils.misc import set_freest_gpu
-
-set_freest_gpu()
+# from evolution.utils.misc import set_freest_gpu
+# 
+# set_freest_gpu()
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
