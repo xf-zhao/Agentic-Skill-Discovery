@@ -193,31 +193,40 @@ def main():
         env, agent_cfg=agent_cfg, log_dir=log_dir, precedents=args_cli.precedents
     )
 
-    for i in tqdm(range(env.max_episode_length)):
-        # run everything in inference mode
-        with torch.inference_mode():
-            # agent stepping
-            actions = policy(obs)
-            # env stepping
-            obs, _, _, extras = env.step(actions)
-            if i in (6, env.max_episode_length - 10):
-                data = extras["observations"]["observations"]
-                data_str = {}
-                for k, v in data.items():
-                    if k in ("actions",):
-                        continue
-                    if v.reshape(-1).shape[0] > 1:
-                        _v = (
-                            "["
-                            + ", ".join(
-                                [f"{vv:.2f}" for vv in v.squeeze().cpu().numpy()]
+    if not args_cli.video:
+        while simulation_app.is_running():
+            # run everything in inference mode
+            with torch.inference_mode():
+                # agent stepping
+                actions = policy(obs)
+                # env stepping
+                obs, _, _, _ = env.step(actions)
+    else:
+        for i in tqdm(range(env.max_episode_length)):
+            # run everything in inference mode
+            with torch.inference_mode():
+                # agent stepping
+                actions = policy(obs)
+                # env stepping
+                obs, _, _, extras = env.step(actions)
+                if i in (6, env.max_episode_length - 10):
+                    data = extras["observations"]["observations"]
+                    data_str = {}
+                    for k, v in data.items():
+                        if k in ("actions",):
+                            continue
+                        if v.reshape(-1).shape[0] > 1:
+                            _v = (
+                                "["
+                                + ", ".join(
+                                    [f"{vv:.2f}" for vv in v.squeeze().cpu().numpy()]
+                                )
+                                + "]"
                             )
-                            + "]"
-                        )
-                    else:
-                        _v = f"{v.squeeze().cpu().numpy():.2f}"
-                    data_str[k] = _v
-                user_obss.append(data_str)
+                        else:
+                            _v = f"{v.squeeze().cpu().numpy():.2f}"
+                        data_str[k] = _v
+                    user_obss.append(data_str)
 
     # close the simulator
     env.close()

@@ -23,7 +23,7 @@ cd orbit
 export ISAACSIM_PATH=/isaac-sim
 export ISAACSIM_PYTHON_EXE="${ISAACSIM_PATH}/python.sh"
 export ORBIT_ROOT_DIR=$(pwd)
-export ZEROHERO_ROOT_DIR=$ORBIT_ROOT_DIR/zero-hero
+export ZEROHERO_ROOT_DIR=$ORBIT_ROOT_DIR/zero_hero
 export PYTHON_EXE="${ISAACSIM_PATH}/python.sh"
 export OPENAI_API_KEY=
 
@@ -32,7 +32,7 @@ export OPENAI_API_KEY=
 ./orbit.sh --extra rsl_rl
 ln -s ${ISAACSIM_PATH} _isaac_sim
 
-cd zero-hero
+cd zero_hero
 git pull
 pip3 install -r requirements.txt
 
@@ -40,10 +40,8 @@ pip3 install -r requirements.txt
 
 ## Minimal Test 
 
-Launch `train.py` under `zero-hero` directory to examine whether oribt is successfully installed.
+Launch `train.py` under `zero_hero` directory to examine whether oribt is successfully installed.
 ```bash
-cd zero-hero
-tmux
 ../orbit.sh -p rsl_rl/train.py --task Franka_Table --headless --num_envs 4096 --max_iterations 10
 ```
 
