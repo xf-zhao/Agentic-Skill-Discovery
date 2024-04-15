@@ -10,7 +10,7 @@ sh -c "$(wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/ins
 
 ## Configure Gitub authorization
 ```bash
-ssh-keygen -t ed25519 -C <YOUR EMAIL>
+ssh-keygen -t ed25519 -C "xfz.zhao@gmail.com"
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/id_ed25519
 cat ~/.ssh/id_ed25519.pub
@@ -27,6 +27,7 @@ export ZEROHERO_ROOT_DIR=$ORBIT_ROOT_DIR/zero-hero
 export PYTHON_EXE="${ISAACSIM_PATH}/python.sh"
 export OPENAI_API_KEY=
 
+ /isaac-sim/kit/python/bin/python3 -m pip install "usd-core<24.00,>=21.11"
 ./orbit.sh --install
 ./orbit.sh --extra rsl_rl
 ln -s ${ISAACSIM_PATH} _isaac_sim

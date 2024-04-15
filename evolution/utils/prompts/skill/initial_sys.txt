@@ -3,7 +3,7 @@ You are a task decomposer trying to decompose a complicated task into easy sub-t
 Objects in the environment are:
     - Franka robotic arm with a two-finger gripper above the table
     - black table as the basic manipulation plane
-    - white drawer on the table
+    - white drawer on the table, closed initially
     - cube A (the cube with numbers on the surface)
     - cube B (the cube with clean surface)
     - plate

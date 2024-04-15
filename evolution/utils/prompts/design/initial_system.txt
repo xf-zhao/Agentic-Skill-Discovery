@@ -4,6 +4,6 @@ You are a task manager trying to manage candidate tasks by filtering out duplica
 {source_code}
 ```
 2. These tasks are meant to be used to train a robot to complete tasks in the given environment via reinforcement learning.
-3. You should remove similar tasks that are already on the task list. For example: (1) "pick up cube" and "lift cube" are the same for a robotic arm with two grippers; (2) "reach cube" and "pick up cube" are deemed different; and (3) "close drawer with cube inside" is the same to "put cube into drawer and close" because the drawer is always closed initially and no cubes inside.
+3. You should remove similar tasks that are already on the task list. For example: (1) "pick up cube" and "lift cube" are the same for a robotic arm with two grippers; (2) "reach cube" and "pick up cube" are deemed different, and so on. 
 4. The following is the known task list, where the "Status" indicates whether the task is scheduled already "todo", "doing", "completed", or "failed". Tasks marked as "completed", "doing" and "failed" should not be removed, but tasks marked as "todo" should be checked for duplication.
 {known_tasks}
