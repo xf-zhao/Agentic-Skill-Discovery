@@ -1,6 +1,67 @@
 
 # Install Everything Inside Isaac Sim Docker
 
+## Test whether IsaacSim docker works
+
+### Local docker test
+1. Pull docker image and run
+```
+docker run --name isaac-sim --entrypoint bash -it --gpus all -e "ACCEPT_EULA=Y" --rm --network=host \
+    -e "PRIVACY_CONSENT=Y" 134.100.39.10:32000/isaacsim:2023.1.1
+```
+
+Reference: https://catalog.ngc.nvidia.com/orgs/nvidia/containers/isaac-sim
+
+2. Inside the launched docker container, execute
+```bash
+cd /isaac-sim
+./runheadless.native.sh
+```
+If normal, no obvious error.
+
+Extra information:
+```text
+NVIDIA-SMI 550.54.15              Driver Version: 550.54.15      CUDA Version: 12.4
+```
+
+### k8s Pod Test
+
+1. Create `yaml` with 
+```bash
+./mlpod.py --yaml isaacsim2.yaml --user gaede --pod isaacsim --image 134.100.39.10:32000/isaacsim:2023.1.1 --gpumem 60 --env ACCEPT_EULA=Y PRIVACY_CONSENT=Y -- /bin/bash
+```
+2. Edit `isaacsim2.yaml` by replacing the two `Y` with `"Y"` (as string instead of as bool value).
+
+3. Create pod with the `yaml` file
+```bash
+alias kubectl k
+k create -f isaacsim2.yaml
+k attach -it isaacsim2
+```
+
+4. Inside the attached pod, run
+```bash
+cd /isaac-sim
+./runheadless.native.sh
+```
+
+May run into errors:
+```text
+2024-04-16 08:45:58 [1,012ms] [Warning] [omni.platforminfo.plugin] failed to open the default display.  Can't verify X Server version.
+2024-04-16 08:45:58 [1,032ms] [Error] [carb.graphics-vulkan.plugin] VkResult: ERROR_INCOMPATIBLE_DRIVER
+2024-04-16 08:45:58 [1,032ms] [Error] [carb.graphics-vulkan.plugin] vkCreateInstance failed. Vulkan 1.1 is not supported, or your driver requires an update.
+2024-04-16 08:45:58 [1,032ms] [Error] [gpu.foundation.plugin] carb::graphics::createInstance failed.
+2024-04-16 08:45:58 [1,608ms] [Error] [carb.graphics-vulkan.plugin] VkResult: ERROR_INCOMPATIBLE_DRIVER
+2024-04-16 08:45:58 [1,608ms] [Error] [carb.graphics-vulkan.plugin] vkCreateInstance failed. Vulkan 1.1 is not supported, or your driver requires an update.
+2024-04-16 08:45:58 [1,608ms] [Error] [gpu.foundation.plugin] carb::graphics::createInstance failed.
+2024-04-16 08:45:59 [2,155ms] [Error] [omni.gpu_foundation_factory.plugin] Failed to create any GPU devices, including an attempt with compatibility mode.
+```
+
+Extra information:
+```text
+NVIDIA-SMI 550.54.14              Driver Version: 550.54.14      CUDA Version: 12.4
+```
+
 ## Install necessary tools
 ```bash
 apt-get update
