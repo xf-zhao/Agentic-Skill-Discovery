@@ -66,13 +66,16 @@ def main(cfg):
         task_node.temperature += 0.2
         if task_node.num_variants >= cfg.num_variants:
             break
-        success_nodes = task_node.propose(
+        task_node.propose(
             n_samples=cfg.n_reward_samples,
             iterations=2,
             temperature=cfg.temperature + task_ite * 0.2,
             model=cfg.model,
         )  # params for child init
         for reward_ite in range(cfg.reward_iterations):
+            success_nodes = task_node.children
+            if len(success_nodes)==0:
+                break
             for success_node in success_nodes:
                 reward_nodes = success_node.propose(
                     num_envs=cfg.num_envs,
@@ -112,14 +115,9 @@ def main(cfg):
             f"Collected new skill {task} with {task_node.num_variants} variants: {variants}."
         )
     else:
-        if task_node.num_candidates > 0:
-            task_status = "compromised"
-            variants = [c.best_reward.idx for c in task_node.candidates]
-            logging.info(f"Mission compromised on {task} with candidates: {variants}.")
-        else:
-            task_status = "failed"
-            logging.info(f"Mission impossible on {task}.")
-            variants = [""]
+        task_status = "failed"
+        logging.info(f"Mission impossible on {task}.")
+        variants = [""]
     tdb.load()
     tdb.update_task({"command": task, "status": task_status, "variants": variants[0]})
     tdb.render()

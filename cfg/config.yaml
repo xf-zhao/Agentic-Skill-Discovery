@@ -27,7 +27,7 @@ design:
     - 0
 debug: False
 headless: True
-max_iterations: 1500 # RL Policy training iterations (decrease this to make the feedback loop faster)
+max_iterations: 2000 # RL Policy training iterations (decrease this to make the feedback loop faster)
 num_envs: 4096
 memory_requirement: 32
 min_gpu: 90

@@ -1445,6 +1445,11 @@ class TaskNode(Node):
 
         return self
 
+    def provide( self, *args, **kwargs):
+        if len(self.children) == 0:
+            return self.propose(*args, **kwargs)
+        return self.children
+
     def propose(
         self, iterations=3, n_samples=3, temperature=0, model="gpt-3.5-turbo"
     ) -> List[SuccessNode]:
@@ -1503,6 +1508,8 @@ class TaskNode(Node):
         variant_video_captions, candidate_video_captions = [], []
         for success_child in children_bak:
             if success_child.best_reward is not None:
+                # control whether to re-use good success functions
+                self.add_child(success_child)
                 num_optimized.append(1)
                 f_succ = int(success_child.best_reward.summary["success"] > 0)
                 num_f_succ.append(f_succ)
@@ -1522,14 +1529,11 @@ class TaskNode(Node):
                     if video_path is not None:
                         variant_videos.append(video_path)
                         variant_video_captions.append(video_caption)
-                    # control whether to re-use good success functions
-                    self.add_child(success_child)
                 else:
                     self._collect_candidate(success_child)
                     if video_path is not None:
                         candidate_videos.append(video_path)
                         candidate_video_captions.append(video_caption)
-                    success_child.unlink()
             else:
                 num_f_succ.append(0)
                 num_v_succ.append(0)
