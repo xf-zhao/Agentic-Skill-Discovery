@@ -32,7 +32,7 @@ num_envs: 4096
 memory_requirement: 32
 min_gpu: 90
 video: False
-task_iterations: 1 # iterate to acquire more variants
+task_iterations: 2 # iterate to acquire more variants
 n_success_samples: 3 # number of samples to generate success function per iteration
 n_reward_samples: 3 # number of samples to generate reward function per iteration. better matcha num of gpus
 reward_iterations: 4

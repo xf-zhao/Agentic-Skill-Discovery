@@ -74,8 +74,6 @@ def main(cfg):
         )  # params for child init
         for reward_ite in range(cfg.reward_iterations):
             success_nodes = task_node.children
-            if len(success_nodes)==0:
-                break
             for success_node in success_nodes:
                 reward_nodes = success_node.propose(
                     num_envs=cfg.num_envs,

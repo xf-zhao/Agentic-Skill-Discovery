@@ -1019,10 +1019,16 @@ class RewardNode(Node):
                 logging.info(
                     f"[Task iter {self.task_ite} - Reward iter {self.reward_ite} - Node {self.idx}]: Successfully launched RL training."
                 )
+                self.s_exec_success = True
+                self.r_exec_success = True
             else:
                 logging.error(
                     f"[Task iter {self.task_ite} - Reward iter {self.reward_ite} - Node {self.idx}]: Execution error!"
                 )
+                if '/success.py' in msg:
+                    self.s_exec_success = False
+                else:
+                    self.r_exec_success = False
                 self.exec_success = False
                 self.success = DUMMY_FAILURE
             logging.info(f"Log at {self.rl_filepath}")
@@ -1039,6 +1045,8 @@ class RewardNode(Node):
             "reward_idx": self.idx,
             "reward_num_syntax_error": self.local_num_syntax_error,
             "exec_success": self.exec_success,
+            "s_exec_success": self.s_exec_success,
+            "r_exec_success": self.r_exec_success,
             "success": self.success,
         }
         return data
@@ -1281,8 +1289,9 @@ class SuccessNode(Node):
     def collect(self):
         for child in self.children:
             child.summarize()
-        exec_successes = [child.summary["exec_success"] for child in self.children]
-        any_success = np.sum(exec_successes) > 0
+        # only succ_func() will terminate iteration to save unnecessary gpt call cost.
+        s_exec_successes = [child.summary["s_exec_success"] for child in self.children]
+        any_success = np.sum(s_exec_successes) > 0
         stat = {
             "syntax_error": 0.0,
             "execute_rate": 0.0,
@@ -1296,6 +1305,7 @@ class SuccessNode(Node):
             self.children = []
             return any_success, stat
 
+        # reward_func exec error will be iterated to evolve
         successes = [child.summary["success"] for child in self.children]
         syntax_errors = [child.local_num_syntax_error for child in self.children]
         # Select the best code sample based on the success rate
@@ -1306,12 +1316,12 @@ class SuccessNode(Node):
                 child.remove()
         best_reward.unlink()
         self.children = []
-        best_reward.caption()
-        if best_reward.caption_data is not None:
-            gpt4v_description = best_reward.caption_data["gpt-4v-description"]
-            gpt4v_feedback = self.gpt4v_tip.format(gpt4v_description=gpt4v_description)
-        else:
-            gpt4v_feedback = ""
+        gpt4v_feedback = ""
+        if best_reward.exec_success:
+            best_reward.caption()
+            if best_reward.caption_data is not None:
+                gpt4v_description = best_reward.caption_data["gpt-4v-description"]
+                gpt4v_feedback = self.gpt4v_tip.format(gpt4v_description=gpt4v_description)
 
         feedback = self._wrap_user_message(
             best_reward.summary["content"] + gpt4v_feedback + self.code_feedback
@@ -1510,9 +1520,10 @@ class TaskNode(Node):
             if success_child.best_reward is not None:
                 # control whether to re-use good success functions
                 self.add_child(success_child)
-                num_optimized.append(1)
                 f_succ = int(success_child.best_reward.summary["success"] > 0)
                 num_f_succ.append(f_succ)
+                f_optimized = int(success_child.best_reward.summary["success"] >= 0)
+                num_optimized.append(f_optimized)
                 caption_data = success_child.best_reward.caption_data
                 if caption_data is not None:
                     v_succ = caption_data["gpt-4v-succ"]
@@ -1524,16 +1535,17 @@ class TaskNode(Node):
                     num_v_succ.append(1)
                 else:
                     num_v_succ.append(0)
-                if v_succ and f_succ:
-                    self._collect_variant(success_child)
-                    if video_path is not None:
-                        variant_videos.append(video_path)
-                        variant_video_captions.append(video_caption)
-                else:
-                    self._collect_candidate(success_child)
-                    if video_path is not None:
-                        candidate_videos.append(video_path)
-                        candidate_video_captions.append(video_caption)
+                if f_succ:
+                    if v_succ:
+                        self._collect_variant(success_child)
+                        if video_path is not None:
+                            variant_videos.append(video_path)
+                            variant_video_captions.append(video_caption)
+                    else:
+                        self._collect_candidate(success_child)
+                        if video_path is not None:
+                            candidate_videos.append(video_path)
+                            candidate_video_captions.append(video_caption)
             else:
                 num_f_succ.append(0)
                 num_v_succ.append(0)
