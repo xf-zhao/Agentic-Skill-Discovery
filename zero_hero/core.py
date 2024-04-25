@@ -837,6 +837,8 @@ class RewardNode(Node):
                 os.makedirs(best_record_dir)
         # For gpt-4-v
         self.caption_data = None
+        self.s_exec_success = True
+        self.r_exec_success = True
 
     def init(self):
         self.caption_data = None
@@ -1027,7 +1029,9 @@ class RewardNode(Node):
                 )
                 if '/success.py' in msg:
                     self.s_exec_success = False
+                    self.r_exec_success = True
                 else:
+                    self.s_exec_success = True
                     self.r_exec_success = False
                 self.exec_success = False
                 self.success = DUMMY_FAILURE
