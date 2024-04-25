@@ -1081,6 +1081,8 @@ class RewardNode(Node):
         content = ""
         success = DUMMY_FAILURE
         summary = {
+            "s_exec_success": self.s_exec_success,
+            "r_exec_success": self.r_exec_success,
             "exec_success": exec_success,
             "content": content,
             "success": success,
@@ -1150,6 +1152,8 @@ class RewardNode(Node):
             self.remove()
 
         summary = {
+            "s_exec_success": self.s_exec_success,
+            "r_exec_success": self.r_exec_success,
             "exec_success": exec_success,
             "content": content,
             "success": success,
