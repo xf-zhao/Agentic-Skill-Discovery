@@ -37,12 +37,13 @@ def main(cfg):
     cfg.task = task
     cfg.seed = seed
     my_cfg = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    if not cfg.use_wandb:
-        wandb = FakeWandb()
-    wandbrun = wandb.init(
-        project=cfg.wandb_project,
-        config=my_cfg,
-    )
+    if cfg.use_wandb:
+        wandbrun = wandb.init(
+            project=cfg.wandb_project,
+            config=my_cfg,
+        )
+    else:
+        wandbrun = FakeWandb(my_cfg)
     precedents = cfg.precedents
     if precedents is not None:
         if isinstance(precedents, str):

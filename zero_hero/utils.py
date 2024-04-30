@@ -1,5 +1,6 @@
 class FakeWandb:
-    def init(self, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
+        print(args)
         print(kwargs)
 
     def log(self, logs):
