@@ -5,4 +5,5 @@ The Python environment is
 Write a success deterministic function for the following task: {task_description}.
 
 - Remember to explicitly configure `SuccessCfg` so that I can directly copy the code.
-- Always call `.squeeze()` when for the return of the success function.
+- Always call `.squeeze()` for observation tensor for `drawer_open_distance` and `gripper_open_distance` to use them consistently.
+- Always call `.squeeze()` for the return of the success function.
