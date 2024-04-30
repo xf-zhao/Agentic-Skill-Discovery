@@ -9,6 +9,7 @@ from evolution.utils.misc import *
 from evolution.utils.extract_task_code import *
 from zero_hero.behavior import BehaviorCaptioner
 from zero_hero.core import TaskNode, TaskDatabase
+from zero_hero.utils import FakeWandb
 
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")
@@ -36,6 +37,8 @@ def main(cfg):
     cfg.task = task
     cfg.seed = seed
     my_cfg = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+    if not cfg.use_wandb:
+        wandb = FakeWandb()
     wandbrun = wandb.init(
         project=cfg.wandb_project,
         config=my_cfg,
@@ -51,7 +54,7 @@ def main(cfg):
             pass
         else:
             raise NotImplementedError
-    task_node = TaskNode(
+    task_node: TaskNode = TaskNode(
         code=cfg.task,
         n_samples=cfg.n_success_samples,
         temperature=cfg.temperature,
@@ -62,7 +65,7 @@ def main(cfg):
         init_sys_prompt=f"{task_node.prompt_dir}/task/behavior_context.txt",
     )
     logging.info(f"Learning skill: {task}.")
-    for task_ite in range(cfg.task_iterations):  
+    for task_ite in range(cfg.task_iterations):
         task_node.temperature += 0.2
         if task_node.num_variants >= cfg.num_variants:
             break

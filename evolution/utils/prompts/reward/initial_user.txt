@@ -4,4 +4,5 @@ The Python environment is
 ```
 Write a shaped reward function for the following task: {task_description}.
 Let's work this out in a step by step way to be sure we have the right answer.
-Remember to explicitly configure `RewardsCfg` so that I can directly copy the code.
+- Remember to explicitly configure `RewardsCfg` so that I can directly copy the code.
+- Always call `.squeeze()` for the return of every reward function result to make a consistant shape.

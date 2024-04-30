@@ -3,4 +3,6 @@ The Python environment is
 {task_obs_code_string}
 ```
 Write a success deterministic function for the following task: {task_description}.
-Remember to explicitly configure `SuccessCfg` so that I can directly copy the code.
+
+- Remember to explicitly configure `SuccessCfg` so that I can directly copy the code.
+- Always call `.squeeze()` when for the return of the success function.

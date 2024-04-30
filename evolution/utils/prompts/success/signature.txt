@@ -4,7 +4,7 @@ def cube_a_is_lifted(env: RLTaskEnv) -> torch.Tensor:
     obs = env.obs_buf["observations"]
     object_height = obs['cube_a_position][:, 2] # x, y, z (height)
     is_success = torch.where(object_height > minimal_height, 1.0, 0.0)
-    return is_success
+    return is_success.squeeze()
 
 
 @configclass

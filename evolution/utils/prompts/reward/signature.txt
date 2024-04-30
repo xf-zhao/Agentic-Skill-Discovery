@@ -6,7 +6,7 @@ def reach_cube_a_with_ee(env: RLTaskEnv) -> torch.Tensor:
     # Distance of the end-effector to the object: (num_envs,)
     distance = torch.norm(obs["cube_a_position"] - obs["ee_position"], dim=1)
     std = 0.1
-    return 1 - torch.tanh(distance / std)
+    return (1 - torch.tanh(distance / std)).squeeze()
 
 def cube_a_is_grasped(env: RLTaskEnv) -> torch.Tensor:
     """Reward the agent for grasping the object"""
@@ -14,7 +14,7 @@ def cube_a_is_grasped(env: RLTaskEnv) -> torch.Tensor:
     cube_a_ee_distance = torch.norm(obs['cube_a_position'] - obs["ee_position"], dim=1)
     is_near_cube = torch.where(cube_a_ee_distance < 0.02, 1.0, 0.0) # 0.01 ~ 0.02 is considered as close enough.
     reward = is_near_cube * (0.04 - obs["gripper_open_distance"].squeeze())
-    return reward
+    return reward.squeeze()
 
 
 def cube_a_is_lifted(env: RLTaskEnv) -> torch.Tensor:
@@ -23,7 +23,7 @@ def cube_a_is_lifted(env: RLTaskEnv) -> torch.Tensor:
     minimal_height = 0.06
     cube_a_height = obs["cube_a_position"][:, 2]
     lifted_reward = torch.where(cube_a_height > minimal_height, 1.0, 0.0)
-    return lifted_reward
+    return lifted_reward.squeeze()
 
 
 @configclass

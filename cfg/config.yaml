@@ -29,7 +29,7 @@ debug: False
 headless: True
 max_iterations: 2000 # RL Policy training iterations (decrease this to make the feedback loop faster)
 num_envs: 4096
-memory_requirement: 32
+memory_requirement: 16
 min_gpu: 90
 video: False
 task_iterations: 2 # iterate to acquire more variants
