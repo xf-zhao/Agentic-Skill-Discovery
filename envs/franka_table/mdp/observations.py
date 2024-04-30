@@ -38,7 +38,7 @@ def ee_position_in_robot_root_frame(env: RLTaskEnv) -> torch.Tensor:
 def gripper_open_distance(env: RLTaskEnv) -> torch.Tensor:
     # Knonw that env.scene['robot'].data.body_names[:-2] -> ['panda_leftfinger', 'panda_rightfinger']
     robot: RigidObject = env.scene["robot"]
-    open_range = robot.data.joint_pos[:, -2:].mean(axis=-1).unsqueeze(-1)
+    open_range = robot.data.joint_pos[:, -2:].mean(axis=-1)
     return open_range
 
 
@@ -68,7 +68,7 @@ def drawer_joint_pos_rel(
     drawer_joint_pos_rel = (
         asset.data.joint_pos[:, -1] - asset.data.default_joint_pos[:, -1]
     )
-    return drawer_joint_pos_rel.unsqueeze(-1)
+    return drawer_joint_pos_rel
 
 
 def drawer_position_in_robot_root_frame(

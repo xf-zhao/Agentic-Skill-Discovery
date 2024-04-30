@@ -82,7 +82,7 @@ class ObservationsCfg:
         ee_position = ObsTerm(func=mdp.ee_position_in_robot_root_frame)
 
         # Robot end-effector (two-finger gripper) open distance
-        # Tensor in a shape (num_envs, 1), from min 0 (closed) to max 0.04 (open)
+        # Tensor in a squeezed shape (num_envs,), from min 0 (closed) to max 0.04 (open)
         gripper_open_distance = ObsTerm(func=mdp.gripper_open_distance)
 
         # cube A position, Tensor in a shape (num_envs, 3)
@@ -110,7 +110,7 @@ class ObservationsCfg:
         )
 
         # to determine whether the drawer is open or not. Closed: 0; open: > 0 values.
-        # Tensor in a shape (num_envs, 1)
+        # Tensor in squeezed shape (num_envs, )
         drawer_open_distance = ObsTerm(
             func=mdp.drawer_joint_pos_rel,
             params={"asset_cfg": SceneEntityCfg("cabinet")},
