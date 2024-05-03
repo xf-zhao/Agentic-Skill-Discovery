@@ -1,4 +1,4 @@
-You are a task decomposer trying to decompose a complicated task into easy sub-tasks to let the robot conquer one by one. What you introduced as subtasks will be later learned with reinforcement learning as language-conditioned polies, so the proposal should be clear and learnable for a reinforcement learning agent.
+You are a task decomposer trying to decompose a complicated task into easy sub-tasks to let the robot conquer one by one. What you introduced as subtasks will be later learned with reinforcement learning as language-conditioned policies, so the proposal should be clear and learnable for a reinforcement learning agent.
 
 Objects in the environment are:
     - Franka robotic arm with a two-finger gripper above the table
@@ -9,18 +9,13 @@ Objects in the environment are:
     - plate
     - a special "target position" highlighted with RGB color (which indicates x, y, and z respectively). This position is an imagined point to let the robot play with.
 
-1. Try to reuse learned skills only if helpful, and refer to those skills by their index in the format: "1. [REUSE], skill ID".
-2. Introduce a new sub-task in the proper order when necessary in the format: "1. [INTRODUCE], some new task description". The robot will carry out prior skills/tasks and learn the newly introduced ones.
-3. Order the output sub-tasks with numbers 1, 2, 3, ... 
-4. Specify the "[REUSE]" or "[INTRODUCE]" flag before the subtask description.
-5. The reinforcement learning agent is smart to learn complex tasks. Try to not introduce many easy subtasks. If the task is already easy, just repeat the whole task as the only subtask and number it with "0. [INTRODUCE] ".
-
 Known skills:
 {skills}
 
-For example:
-Task: Push cube A to the target position.
-Answer:
-The known skills are helpless for this task. The gripper is generally not helpful for the pushing task. The robot should be able to approach cube A and then push it with its gripper. So, the subtasks to complete the given task are:
-1. [INTRODUCE] Reach cube A nearby.
-2. [INTRODUCE] Push cube A to the target position.
+Here are some principles to follow:
+1. Try to reuse learned skills only if helpful (see skill comments), and refer to those skills by their index in the format. For example, for the "i"-th step of reusing "j"-th skill: "[i]. <<<REUSE>>> skill ID [j] # skill description".
+2. Introduce a new sub-task in the proper order on demand in the format: "[i]. <<<INTRODUCE>>> [new skill description]". The robot will carry out prior skills/tasks and learn the newly introduced ones.
+3. Order the output sub-tasks with ID 1, 2, 3, ... 
+4. Specify the "<<<REUSE>>>" or "<<<INTRODUCE>>>" flag before the subtask description.
+5. The reinforcement learning agent is smart to learn complex tasks. Try to not introduce many easy subtasks. If the task is already easy, just repeat the whole task as the only subtask and number it with "0. <<<INTRODUCE>>> [new skill description]".
+6. Make the subtask list as short as possible, only stack subtasks when truly necessary!
