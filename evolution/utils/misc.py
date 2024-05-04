@@ -6,21 +6,23 @@ import logging
 
 # from .extract_task_code import file_to_string
 
-def set_freest_gpu():
-    freest_gpu, gpu_avi = get_freest_gpu()
+def set_freest_gpu(mode='RTX'):
+    freest_gpu, gpu_avi = get_freest_gpu(mode=mode)
+    os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
     os.environ['CUDA_VISIBLE_DEVICES'] = str(freest_gpu)
     return gpu_avi
 
-def get_freest_gpu(key='util'):
+def get_freest_gpu(mode='RTX',key='util'):
     if key == 'util':
-        return get_freest_util_gpu()
+        return get_freest_util_gpu(mode=mode)
     return get_freest_mem_gpu()
 
-def get_freest_util_gpu():
+def get_freest_util_gpu(mode='RTX'): # or 'GTX'
     sp = subprocess.Popen(['gpustat', '--json'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out_str, _ = sp.communicate()
     gpustats = json.loads(out_str.decode('utf-8'))
-    freest_gpu = max(gpustats['gpus'], key=lambda x: 100 - x['utilization.gpu'])
+    gpus = [gpu for gpu in gpustats['gpus'] if mode in gpu['name']]
+    freest_gpu = max(gpus, key=lambda x: 100 - x['utilization.gpu'])
     gpu_util_avi = (100 - freest_gpu['utilization.gpu']) # * 100 %
     return freest_gpu['index'], gpu_util_avi
 

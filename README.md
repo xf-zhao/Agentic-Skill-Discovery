@@ -3,7 +3,7 @@
 ## Install necessary tools
 ```bash
 apt-get update
-apt-get install -y tmux zsh wget git python3 python3-pip vim
+apt-get install -y tmux zsh wget git python3 python3-pip vim openssh-client
 sh -c "$(wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -O -)"
 ```
 

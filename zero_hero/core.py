@@ -885,17 +885,17 @@ class RewardNode(Node):
             logging.info(f"Removed node {self.idx} and its directory {cur_env_dir}.")
         return
 
-    def _prepare_launch(self):
+    def _prepare_launch(self, mode="RTX"):
         # Only run when memory is enough
         # Maximum 24 hour waiting time, long enough for finishing one run
-        max_waiting = 60 * 12 # mins, so here 12h
+        max_waiting = 60 * 12  # mins, so here 12h
         for i in range(max_waiting):
             available_mem = psutil.virtual_memory().available / 1024 / 1024 / 1024
             is_enough = (
                 available_mem > self.memory_requirement
             )  # 16 GB is the minimum mem for a new instance
             # Find the freest GPU to run GPU-accelerated RL
-            gpu_avi = set_freest_gpu()
+            gpu_avi = set_freest_gpu(mode=mode)
             is_valid = gpu_avi >= self.min_gpu
             if is_enough and is_valid:
                 break
@@ -909,7 +909,7 @@ class RewardNode(Node):
         return
 
     def run(self):
-        self._prepare_launch()
+        self._prepare_launch(mode="GTX")
 
         # Execute the python file with flags
         rl_run_command = [
@@ -940,7 +940,7 @@ class RewardNode(Node):
         return self
 
     def play(self, suffix="_videos"):
-        self._prepare_launch()
+        self._prepare_launch(mode="RTX")
 
         # Execute the python file with flags
         play_run_command = [
@@ -1027,7 +1027,7 @@ class RewardNode(Node):
                 logging.error(
                     f"[Task iter {self.task_ite} - Reward iter {self.reward_ite} - Node {self.idx}]: Execution error!"
                 )
-                if '/success.py' in msg:
+                if "/success.py" in msg:
                     self.s_exec_success = False
                     self.r_exec_success = True
                 else:
@@ -1329,7 +1329,9 @@ class SuccessNode(Node):
             best_reward.caption()
             if best_reward.caption_data is not None:
                 gpt4v_description = best_reward.caption_data["gpt-4v-description"]
-                gpt4v_feedback = self.gpt4v_tip.format(gpt4v_description=gpt4v_description)
+                gpt4v_feedback = self.gpt4v_tip.format(
+                    gpt4v_description=gpt4v_description
+                )
 
         feedback = self._wrap_user_message(
             best_reward.summary["content"] + gpt4v_feedback + self.code_feedback
@@ -1463,7 +1465,7 @@ class TaskNode(Node):
 
         return self
 
-    def provide( self, *args, **kwargs):
+    def provide(self, *args, **kwargs):
         if len(self.children) == 0:
             return self.propose(*args, **kwargs)
         return self.children

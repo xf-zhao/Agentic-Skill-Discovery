@@ -34,7 +34,7 @@ min_gpu: 90
 video: False
 task_iterations: 2 # iterate to acquire more variants
 n_success_samples: 3 # number of samples to generate success function per iteration
-n_reward_samples: 3 # number of samples to generate reward function per iteration. better matcha num of gpus
+n_reward_samples: 5 # number of samples to generate reward function per iteration
 reward_iterations: 4
 num_variants: 9999 # break if sufficient
 task: 'Place cube A on top of cube B carefully, aligning their surfaces to stack them.'
