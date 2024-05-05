@@ -2,8 +2,13 @@ The Python environment is
 ```python
 {task_obs_code_string}
 ```
-Write a shaped reward function for the following task: {task_description}.
+To prepare for pre-conditions, previously executed skills are:
+{precedent_skills}
+And, the next subtask is to learn {task_description}.
+
+Knowing these information, now please write a shaped reward function for the task: {task_description}.
 Let's work this out in a step by step way to be sure we have the right answer.
+
 - Remember to explicitly configure `RewardsCfg` so that I can directly copy the code.
 - Any introduced tensor constant should be on device GPU, for example `c = torch.tensor([1., 2.]).cuda()`
 - Always call `.squeeze()` for observation tensor for `drawer_open_distance` and `gripper_open_distance` to use them consistently.

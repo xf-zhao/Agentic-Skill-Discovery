@@ -45,16 +45,6 @@ def main(cfg):
     else:
         wandbrun = FakeWandb(my_cfg)
     precedents = cfg.precedents
-    if precedents is not None:
-        if isinstance(precedents, str):
-            if len(precedents) > 0:
-                precedents = precedents.split(",")
-            else:
-                precedents = None
-        elif isinstance(precedents, list):
-            pass
-        else:
-            raise NotImplementedError
     task_node: TaskNode = TaskNode(
         code=cfg.task,
         n_samples=cfg.n_success_samples,

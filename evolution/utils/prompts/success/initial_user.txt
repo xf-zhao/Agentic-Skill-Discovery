@@ -2,7 +2,12 @@ The Python environment is
 ```python
 {task_obs_code_string}
 ```
-Write a success deterministic function for the following task: {task_description}.
+
+To prepare for pre-conditions, previously executed skills are:
+{precedent_skills}
+And, the next subtask is to learn {task_description}.
+
+Knowing these information, now please write a success deterministic function for this task {task_description}.
 
 - Remember to explicitly configure `SuccessCfg` so that I can directly copy the code.
 - Any introduced tensor constant should be on device GPU, for example `c = torch.tensor([1., 2.]).cuda()`

@@ -119,7 +119,7 @@ def extract_tasks(content, pattern=r"([Tt]ask(\s+\d+)?:.*)"):
                 .replace("specific", "target")
                 .replace("specified", "target")
                 .replace("target target", "target")
-                .replace("**", "")
+                .replace("**", "").strip()
             )
             for task, __ in tasks
         ]
@@ -526,6 +526,10 @@ class Node:
         self.prompt_dir = f"{self.root_dir}/evolution/utils/prompts"
         self.env_name = env_name
         self.precedents = precedents
+        if precedents is not None and len(precedents)>0:
+            self.precedent_skills = '\n'.join([f'({i}) {skill}' for i, skill in enumerate(self.precedents.values())])
+        else:
+            self.precedent_skills = ''
         self.type = type
         self.parent = None
         self.children = []
@@ -1220,6 +1224,7 @@ class SuccessNode(Node):
         initial_user = self.initial_user.format(
             task_obs_code_string=self.env_obs_code,
             task_description=self.task,
+            precedent_skills = self.precedent_skills,
         )
         self.messages = [
             self._wrap_system_message(initial_system),
@@ -1457,6 +1462,7 @@ class TaskNode(Node):
         initial_user = self.initial_user.format(
             task_obs_code_string=self.env_obs_code,
             task_description=self.code,
+            precedent_skills=self.precedent_skills,
         )
         self.messages = [
             self._wrap_system_message(initial_system),
