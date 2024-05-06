@@ -526,10 +526,6 @@ class Node:
         self.prompt_dir = f"{self.root_dir}/evolution/utils/prompts"
         self.env_name = env_name
         self.precedents = precedents
-        if precedents is not None and len(precedents)>0:
-            self.precedent_skills = '\n'.join([f'({i}) {skill}' for i, skill in enumerate(self.precedents.values())])
-        else:
-            self.precedent_skills = ''
         self.type = type
         self.parent = None
         self.children = []
@@ -568,6 +564,10 @@ class Node:
     def init(self):
         if self.idx is None:
             self.idx = f"{self.type[0]}{uuid.uuid4().hex[:8]}"
+        if self.precedents is not None and len(self.precedents)>0:
+            self.precedent_skills = '\n'.join([f'({i}) {skill}' for i, skill in enumerate(self.precedents.values())])
+        else:
+            self.precedent_skills = ''
         self.children = []
         return self
 
