@@ -79,6 +79,7 @@ def main(cfg):
                     task_ite=task_ite,
                     reward_ite=reward_ite,
                     behavior_captioner=bc,
+                    finetune=cfg.finetune,
                 )
                 for node in reward_nodes:
                     node.run()

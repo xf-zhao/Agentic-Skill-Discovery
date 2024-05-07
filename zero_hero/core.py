@@ -705,7 +705,7 @@ class Node:
             "@torch.jit.script": "",
             "@staticmethod": "",
         },
-        prefix_codes="import torch\n\n",
+        prefix_codes="import torch\nfrom typing import Dict, List, Tuple\n",
         remove_temp=False,
     ):
         if code is None:
@@ -796,6 +796,7 @@ class RewardNode(Node):
         task_ite=1,
         reward_ite=1,
         behavior_captioner: BehaviorCaptioner = None,
+        finetune =False,
         *args,
         **kwargs,
     ) -> None:
@@ -806,6 +807,7 @@ class RewardNode(Node):
         self.headless = headless
         self.task_ite = task_ite
         self.reward_ite = reward_ite
+        self.finetune = finetune
         self.video = video
         self.runable = True
         self.success_idx = None
@@ -878,6 +880,15 @@ class RewardNode(Node):
             with open(reward_file, "w") as file:
                 file.write(REWARD_INIT)
                 file.writelines(self.code + "\n")
+        if self.precedents is not None and len(self.precedents)>0 and self.finetune:
+            precedent_idx = list(self.precedents.keys())[0]
+            precedent_logpath = f'{self.root_dir}/envs_gpt/{self.env_name}/{precedent_idx}/logs'
+            pts = [thing.lstrip('model_').rstrip('.pt') for thing in os.listdir(precedent_logpath) if thing.startswith('model_') and thing.endswith('.pt')]
+            max_epoch = max([int(pt) for pt in pts])
+            pt_finetune = f'model_{max_epoch}.pt'
+            os.makedirs(f'{cur_env_dir}/logs', exist_ok=True)
+            shutil.copy(f'{precedent_logpath}/{pt_finetune}', f'{cur_env_dir}/logs/')
+            shutil.copytree(f'{precedent_logpath}/params', f'{cur_env_dir}/logs/params')
 
         return self
 
@@ -1243,6 +1254,7 @@ class SuccessNode(Node):
         task_ite=1,
         reward_ite=1,
         behavior_captioner=None,
+        finetune=False,
     ) -> List[RewardNode]:
         self.children: List[RewardNode] = []
         choices = gpt_call(
@@ -1293,6 +1305,7 @@ class SuccessNode(Node):
                 reward_ite=reward_ite,
                 behavior_captioner=behavior_captioner,
                 precedents=self.precedents,
+                finetune=finetune,
                 local_num_syntax_error=local_num_syntax_error,
             )
             self.add_child(child)
