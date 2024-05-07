@@ -39,6 +39,6 @@ reward_iterations: 4
 num_variants: 9999 # break if sufficient
 task: 'Place cube A on top of cube B carefully, aligning their surfaces to stack them.'
 precedents: 
-  - Rabac9e60: "Pick up cube A."
+  Rabac9e60: "Pick up cube A."
 use_wandb: True
 wandb_project: "Zero-Hero" # wandb project if logging with wandb
