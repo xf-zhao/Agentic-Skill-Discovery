@@ -889,7 +889,7 @@ class RewardNode(Node):
             os.makedirs(f'{cur_env_dir}/logs', exist_ok=True)
             shutil.copy(f'{precedent_logpath}/{pt_finetune}', f'{cur_env_dir}/logs/')
             os.rename(f'{cur_env_dir}/logs/{pt_finetune}', f'{cur_env_dir}/logs/model_1.pt')
-            shutil.copytree(f'{precedent_logpath}/params', f'{cur_env_dir}/logs/params')
+            # shutil.copytree(f'{precedent_logpath}/params', f'{cur_env_dir}/logs/params')
 
         return self
 
@@ -1015,15 +1015,14 @@ class RewardNode(Node):
         if self.headless:
             run_command.append("--headless")
         if self.precedents is not None and len(self.precedents) > 0:
-            if not self.finetune:
-                run_command.append("--precedents")
-                for precedent in self.precedents:
-                    if not precedent.startswith("/"):
-                        precedent = (
-                            f"{ZEROHERO_ROOT_DIR}/envs_gpt/{self.env_name}/{precedent}"
-                        )
-                    run_command.append(precedent)
-            else:
+            run_command.append("--precedents")
+            for precedent in self.precedents:
+                if not precedent.startswith("/"):
+                    precedent = (
+                        f"{ZEROHERO_ROOT_DIR}/envs_gpt/{self.env_name}/{precedent}"
+                    )
+                run_command.append(precedent)
+            if self.finetune:
                 run_command.append('--resume')
                 run_command.append('True')
         print(f"Executing commands: {run_command}")

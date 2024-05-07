@@ -160,8 +160,9 @@ def main():
     # save resume path before creating a new log_dir
     if agent_cfg.resume:
         # get path to previous checkpoint
+        log_dir_parent = os.path.dirname(log_dir)
         resume_path = get_checkpoint_path(
-            log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint
+            log_dir_parent, agent_cfg.load_run, agent_cfg.load_checkpoint
         )
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
         # load previously trained model
