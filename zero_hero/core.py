@@ -888,6 +888,7 @@ class RewardNode(Node):
             pt_finetune = f'model_{max_epoch}.pt'
             os.makedirs(f'{cur_env_dir}/logs', exist_ok=True)
             shutil.copy(f'{precedent_logpath}/{pt_finetune}', f'{cur_env_dir}/logs/')
+            os.rename(f'{cur_env_dir}/logs/{pt_finetune}', f'{cur_env_dir}/logs/model_1.pt')
             shutil.copytree(f'{precedent_logpath}/params', f'{cur_env_dir}/logs/params')
 
         return self
@@ -1013,7 +1014,7 @@ class RewardNode(Node):
     def _fill_command(self, run_command):
         if self.headless:
             run_command.append("--headless")
-        if self.precedents is not None and len(self.precedents) > 0:
+        if self.precedents is not None and len(self.precedents) > 0 and not self.finetune:
             run_command.append("--precedents")
             for precedent in self.precedents:
                 if not precedent.startswith("/"):
