@@ -21,7 +21,7 @@ def get_freest_util_gpu(mode='RTX'): # or 'GTX'
     sp = subprocess.Popen(['gpustat', '--json'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out_str, _ = sp.communicate()
     gpustats = json.loads(out_str.decode('utf-8'))
-    gpus = [gpu for gpu in gpustats['gpus'] if mode in gpu['name']]
+    gpus = [gpu for gpu in gpustats['gpus'] if mode in gpu['name'] and (gpu['memory.total'] - gpu['memory.used'])/1024 >= 10] # to have enought mem
     if len(gpus) == 0:
         gpus = gpustats['gpus']
     freest_gpu = max(gpus, key=lambda x: 100 - x['utilization.gpu'])
