@@ -36,6 +36,9 @@ def main(cfg):
         return
     cfg.task = task
     cfg.seed = seed
+    precedents = cfg.precedents
+    if precedents is None or len(precedents) ==0:
+        cfg.finetune = False
     my_cfg = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     if cfg.use_wandb:
         wandbrun = wandb.init(
@@ -44,7 +47,6 @@ def main(cfg):
         )
     else:
         wandbrun = FakeWandb(my_cfg)
-    precedents = cfg.precedents
     task_node: TaskNode = TaskNode(
         code=cfg.task,
         n_samples=cfg.n_success_samples,
