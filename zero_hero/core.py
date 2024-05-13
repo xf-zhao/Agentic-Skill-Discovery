@@ -962,7 +962,6 @@ class RewardNode(Node):
                 rl_run_command,
                 stdout=f,
                 stderr=f,
-                shell=True,
                 env={**os.environ, **gpu_env},
             )
         self._block_until_training()
@@ -995,7 +994,6 @@ class RewardNode(Node):
                 play_run_command,
                 stdout=f,
                 stderr=f,
-                shell=True,
                 env={**os.environ, **gpu_env},
             )
         playbacks = self._block_until_play_recorded()
