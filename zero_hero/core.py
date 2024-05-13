@@ -913,7 +913,7 @@ class RewardNode(Node):
         return
 
     def _prepare_launch(self, mode="RTX"):
-        gpu_command = []
+        gpu_env = {}
         # Only run when memory is enough
         # Maximum 24 hour waiting time, long enough for finishing one run
         max_waiting = 60 * 12  # mins, so here 12h
@@ -923,7 +923,7 @@ class RewardNode(Node):
                 available_mem > self.memory_requirement
             )  # 16 GB is the minimum mem for a new instance
             # Find the freest GPU to run GPU-accelerated RL
-            is_valid, gpu_command = set_freest_gpu(mode=mode, min_gpu=self.min_gpu)
+            is_valid, gpu_env = set_freest_gpu(mode=mode, min_gpu=self.min_gpu)
             if is_enough and is_valid:
                 break
             else:
@@ -933,14 +933,13 @@ class RewardNode(Node):
                     )
                 time.sleep(60)
         assert i < max_waiting - 1
-        return gpu_command
+        return gpu_env
 
     def run(self):
-        gpu_command = self._prepare_launch(mode="GTX")
+        gpu_env = self._prepare_launch(mode="GTX")
 
         # Execute the python file with flags
         rl_run_command = [
-            *gpu_command,
             f"{ORBIT_ROOT_DIR}/orbit.sh",
             "-p",
             f"{self.root_dir}/rsl_rl/train.py",
@@ -964,16 +963,16 @@ class RewardNode(Node):
                 stdout=f,
                 stderr=f,
                 shell=True,
+                env={**os.environ, **gpu_env},
             )
         self._block_until_training()
         return self
 
     def play(self, suffix="_videos"):
-        gpu_commands = self._prepare_launch(mode="RTX")
+        gpu_env = self._prepare_launch(mode="RTX")
 
         # Execute the python file with flags
         play_run_command = [
-            *gpu_commands,
             f"{ORBIT_ROOT_DIR}/orbit.sh",
             "-p",
             f"{self.root_dir}/rsl_rl/play.py",
@@ -993,7 +992,11 @@ class RewardNode(Node):
         self.play_filepath = self.rl_filepath.rstrip(".txt") + "_play.txt"
         with open(self.play_filepath, "w") as f:
             self.play_run = subprocess.Popen(
-                play_run_command, stdout=f, stderr=f, shell=True
+                play_run_command,
+                stdout=f,
+                stderr=f,
+                shell=True,
+                env={**os.environ, **gpu_env},
             )
         playbacks = self._block_until_play_recorded()
         self.playbacks = playbacks
