@@ -963,15 +963,17 @@ class RewardNode(Node):
                 rl_run_command,
                 stdout=f,
                 stderr=f,
+                shell=True,
             )
         self._block_until_training()
         return self
 
     def play(self, suffix="_videos"):
-        self._prepare_launch(mode="RTX")
+        gpu_commands = self._prepare_launch(mode="RTX")
 
         # Execute the python file with flags
         play_run_command = [
+            *gpu_commands,
             f"{ORBIT_ROOT_DIR}/orbit.sh",
             "-p",
             f"{self.root_dir}/rsl_rl/play.py",
@@ -990,7 +992,9 @@ class RewardNode(Node):
         play_run_command = self._fill_command(play_run_command)
         self.play_filepath = self.rl_filepath.rstrip(".txt") + "_play.txt"
         with open(self.play_filepath, "w") as f:
-            self.play_run = subprocess.Popen(play_run_command, stdout=f, stderr=f)
+            self.play_run = subprocess.Popen(
+                play_run_command, stdout=f, stderr=f, shell=True
+            )
         playbacks = self._block_until_play_recorded()
         self.playbacks = playbacks
         return playbacks
