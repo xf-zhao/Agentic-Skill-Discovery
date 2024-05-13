@@ -38,7 +38,7 @@ def get_freest_mem_gpu():
     return freest_gpu['index'], gpu_mem_avi
 
 def filter_traceback(s, idx=None):
-    if 'Learning iteration 0/' in s:
+    if 'Learning iteration ' in s:
         return ''
     pattern = r'(Traceback.*Error:\s.*?\n)'
     traceback_msgs = re.findall(pattern, s, re.DOTALL)
