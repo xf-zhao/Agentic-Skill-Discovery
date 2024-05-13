@@ -119,7 +119,8 @@ def extract_tasks(content, pattern=r"([Tt]ask(\s+\d+)?:.*)"):
                 .replace("specific", "target")
                 .replace("specified", "target")
                 .replace("target target", "target")
-                .replace("**", "").strip()
+                .replace("**", "")
+                .strip()
             )
             for task, __ in tasks
         ]
@@ -564,10 +565,12 @@ class Node:
     def init(self):
         if self.idx is None:
             self.idx = f"{self.type[0]}{uuid.uuid4().hex[:8]}"
-        if self.precedents is not None and len(self.precedents)>0:
-            self.precedent_skills = '\n'.join([f'({i}) {skill}' for i, skill in enumerate(self.precedents.values())])
+        if self.precedents is not None and len(self.precedents) > 0:
+            self.precedent_skills = "\n".join(
+                [f"({i}) {skill}" for i, skill in enumerate(self.precedents.values())]
+            )
         else:
-            self.precedent_skills = ''
+            self.precedent_skills = ""
         self.children = []
         return self
 
@@ -796,7 +799,7 @@ class RewardNode(Node):
         task_ite=1,
         reward_ite=1,
         behavior_captioner: BehaviorCaptioner = None,
-        finetune =False,
+        finetune=False,
         *args,
         **kwargs,
     ) -> None:
@@ -880,15 +883,23 @@ class RewardNode(Node):
             with open(reward_file, "w") as file:
                 file.write(REWARD_INIT)
                 file.writelines(self.code + "\n")
-        if self.precedents is not None and len(self.precedents)>0 and self.finetune:
+        if self.precedents is not None and len(self.precedents) > 0 and self.finetune:
             precedent_idx = list(self.precedents.keys())[0]
-            precedent_logpath = f'{self.root_dir}/envs_gpt/{self.env_name}/{precedent_idx}/logs'
-            pts = [thing.lstrip('model_').rstrip('.pt') for thing in os.listdir(precedent_logpath) if thing.startswith('model_') and thing.endswith('.pt')]
+            precedent_logpath = (
+                f"{self.root_dir}/envs_gpt/{self.env_name}/{precedent_idx}/logs"
+            )
+            pts = [
+                thing.lstrip("model_").rstrip(".pt")
+                for thing in os.listdir(precedent_logpath)
+                if thing.startswith("model_") and thing.endswith(".pt")
+            ]
             max_epoch = max([int(pt) for pt in pts])
-            pt_finetune = f'model_{max_epoch}.pt'
-            os.makedirs(f'{cur_env_dir}/logs', exist_ok=True)
-            shutil.copy(f'{precedent_logpath}/{pt_finetune}', f'{cur_env_dir}/logs/')
-            os.rename(f'{cur_env_dir}/logs/{pt_finetune}', f'{cur_env_dir}/logs/model_1.pt')
+            pt_finetune = f"model_{max_epoch}.pt"
+            os.makedirs(f"{cur_env_dir}/logs", exist_ok=True)
+            shutil.copy(f"{precedent_logpath}/{pt_finetune}", f"{cur_env_dir}/logs/")
+            os.rename(
+                f"{cur_env_dir}/logs/{pt_finetune}", f"{cur_env_dir}/logs/model_1.pt"
+            )
             # shutil.copytree(f'{precedent_logpath}/params', f'{cur_env_dir}/logs/params')
 
         return self
@@ -902,6 +913,7 @@ class RewardNode(Node):
         return
 
     def _prepare_launch(self, mode="RTX"):
+        gpu_command = []
         # Only run when memory is enough
         # Maximum 24 hour waiting time, long enough for finishing one run
         max_waiting = 60 * 12  # mins, so here 12h
@@ -911,24 +923,24 @@ class RewardNode(Node):
                 available_mem > self.memory_requirement
             )  # 16 GB is the minimum mem for a new instance
             # Find the freest GPU to run GPU-accelerated RL
-            gpu_avi = set_freest_gpu(mode=mode)
-            is_valid = gpu_avi >= self.min_gpu
+            is_valid, gpu_command = set_freest_gpu(mode=mode, min_gpu=self.min_gpu)
             if is_enough and is_valid:
                 break
             else:
                 if i % 10 == 0:
                     logging.info(
-                        f"Available RAM: {available_mem} (require {self.memory_requirement}); Available GPU: {gpu_avi} (require {self.min_gpu}). Waiting for enough resouces to run node {self.idx}. Time elapsed: {i} minutes."
+                        f"Available RAM: {available_mem} (require {self.memory_requirement}); Available GPU avilablility: {is_valid} (require {self.min_gpu}). Waiting for enough resouces to run node {self.idx}. Time elapsed: {i} minutes."
                     )
                 time.sleep(60)
         assert i < max_waiting - 1
-        return
+        return gpu_command
 
     def run(self):
-        self._prepare_launch(mode="GTX")
+        gpu_command = self._prepare_launch(mode="GTX")
 
         # Execute the python file with flags
         rl_run_command = [
+            *gpu_command,
             f"{ORBIT_ROOT_DIR}/orbit.sh",
             "-p",
             f"{self.root_dir}/rsl_rl/train.py",
@@ -1023,8 +1035,8 @@ class RewardNode(Node):
                     )
                 run_command.append(precedent)
             if self.finetune:
-                run_command.append('--resume')
-                run_command.append('True')
+                run_command.append("--resume")
+                run_command.append("True")
         print(f"Executing commands: {run_command}")
         return run_command
 
@@ -1239,7 +1251,7 @@ class SuccessNode(Node):
         initial_user = self.initial_user.format(
             task_obs_code_string=self.env_obs_code,
             task_description=self.task,
-            precedent_skills = self.precedent_skills,
+            precedent_skills=self.precedent_skills,
         )
         self.messages = [
             self._wrap_system_message(initial_system),
