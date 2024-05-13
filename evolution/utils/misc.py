@@ -7,16 +7,11 @@ import logging
 # from .extract_task_code import file_to_string
 
 
-def set_freest_gpu(mode="RTX", min_gpu=80):
+def set_freest_gpu(mode="RTX"):
     freest_gpu, gpu_avi = get_freest_gpu(mode=mode)
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = str(freest_gpu)
-    gpu_env = {
-        "CUDA_VISIBLE_DEVICES": "PCI_BUS_ID",
-        "CUDA_VISIBLE_DEVICES": str(freest_gpu),
-    }
-    is_valid = gpu_avi > min_gpu
-    return is_valid, gpu_env
+    return gpu_avi
 
 
 def get_freest_gpu(mode="RTX", key="util"):

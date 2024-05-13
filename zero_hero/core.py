@@ -913,7 +913,6 @@ class RewardNode(Node):
         return
 
     def _prepare_launch(self, mode="RTX"):
-        gpu_env = {}
         # Only run when memory is enough
         # Maximum 24 hour waiting time, long enough for finishing one run
         max_waiting = 60 * 12  # mins, so here 12h
@@ -923,20 +922,20 @@ class RewardNode(Node):
                 available_mem > self.memory_requirement
             )  # 16 GB is the minimum mem for a new instance
             # Find the freest GPU to run GPU-accelerated RL
-            is_valid, gpu_env = set_freest_gpu(mode=mode, min_gpu=self.min_gpu)
-            if is_enough and is_valid:
+            gpu_avi = set_freest_gpu(mode=mode)
+            if is_enough and gpu_avi > self.min_gpu:
                 break
             else:
                 if i % 10 == 0:
                     logging.info(
-                        f"Available RAM: {available_mem} (require {self.memory_requirement}); Available GPU avilablility: {is_valid} (require {self.min_gpu}). Waiting for enough resouces to run node {self.idx}. Time elapsed: {i} minutes."
+                        f"Available RAM: {available_mem} (require {self.memory_requirement}); Available GPU avilablility: {gpu_avi} (require {self.min_gpu}). Waiting for enough resouces to run node {self.idx}. Time elapsed: {i} minutes."
                     )
                 time.sleep(60)
         assert i < max_waiting - 1
-        return gpu_env
+        return
 
     def run(self):
-        gpu_env = self._prepare_launch(mode="GTX")
+        self._prepare_launch(mode="GTX")
 
         # Execute the python file with flags
         rl_run_command = [
@@ -962,13 +961,12 @@ class RewardNode(Node):
                 rl_run_command,
                 stdout=f,
                 stderr=f,
-                env={**os.environ, **gpu_env},
             )
         self._block_until_training()
         return self
 
     def play(self, suffix="_videos"):
-        gpu_env = self._prepare_launch(mode="RTX")
+        self._prepare_launch(mode="RTX")
 
         # Execute the python file with flags
         play_run_command = [
@@ -994,7 +992,6 @@ class RewardNode(Node):
                 play_run_command,
                 stdout=f,
                 stderr=f,
-                env={**os.environ, **gpu_env},
             )
         playbacks = self._block_until_play_recorded()
         self.playbacks = playbacks

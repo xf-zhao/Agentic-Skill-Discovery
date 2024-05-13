@@ -11,7 +11,6 @@ from __future__ import annotations
 
 
 import argparse
-import os
 
 from omni.isaac.orbit.app import AppLauncher
 
@@ -61,6 +60,7 @@ cli_args.add_rsl_rl_args(parser)
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
+import os
 # load cheaper kit config in headless
 if args_cli.headless:
     app_experience = f"{os.environ['EXP_PATH']}/omni.isaac.sim.python.gym.headless.kit"
