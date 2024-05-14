@@ -39,7 +39,8 @@ class BehaviorCaptioner:
     def __init__(
         self,
         init_sys_prompt,
-        model="gpt-4-vision-preview",
+        # model="gpt-4-vision-preview",
+        model="gpt-4o",
         save=True,
         caption_output="caption.txt",
     ) -> None:
