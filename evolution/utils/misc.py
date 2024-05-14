@@ -31,6 +31,12 @@ def get_freest_util_gpu(mode="RTX"):  # or 'GTX'
         for gpu in gpustats["gpus"]
         if mode in gpu["name"]
         and (gpu["memory.total"] - gpu["memory.used"]) / 1024 >= 8
+        and (
+            gpu["index"]
+            not in [
+                0,
+            ]
+        )
     ]  # to have enought mem
     if len(gpus) == 0:
         gpus = gpustats["gpus"]
