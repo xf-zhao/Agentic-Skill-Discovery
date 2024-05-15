@@ -54,6 +54,7 @@ parser.add_argument(
 parser.add_argument(
     "--precedents", nargs="+", default=None, help="Executing precedent skills."
 )
+
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
