@@ -54,15 +54,7 @@ parser.add_argument(
 parser.add_argument(
     "--precedents", nargs="+", default=None, help="Executing precedent skills."
 )
-parser.add_argument(
-    "--active_gpu", type=int, default=0, help="GPU to launch Isaac (Vulkan)."
-)
-parser.add_argument(
-    "--physics_gpu", type=int, default=0, help="GPU to launch Isaac (cuda)."
-)
-parser.add_argument(
-    "--multi_gpu", type=bool, default=False, help="GPU to launch Isaac (Vulkan)."
-)
+
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
