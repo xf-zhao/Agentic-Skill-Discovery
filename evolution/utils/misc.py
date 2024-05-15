@@ -9,8 +9,9 @@ import logging
 
 def set_freest_gpu(mode="RTX"):
     freest_gpu, gpu_avi = get_freest_gpu(mode=mode)
+    freest_gpu = str(freest_gpu)
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(freest_gpu)
+    os.environ["CUDA_VISIBLE_DEVICES"] = freest_gpu
     return freest_gpu, gpu_avi
 
 
