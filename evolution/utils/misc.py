@@ -11,7 +11,7 @@ def set_freest_gpu(mode="RTX"):
     freest_gpu, gpu_avi = get_freest_gpu(mode=mode)
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = str(freest_gpu)
-    return gpu_avi
+    return freest_gpu, gpu_avi
 
 
 def get_freest_gpu(mode="RTX", key="util"):

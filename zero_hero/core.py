@@ -913,6 +913,7 @@ class RewardNode(Node):
         return
 
     def _prepare_launch(self, mode="RTX"):
+        gpu_command = []
         # Only run when memory is enough
         # Maximum 24 hour waiting time, long enough for finishing one run
         max_waiting = 60 * 12  # mins, so here 12h
@@ -922,20 +923,21 @@ class RewardNode(Node):
                 available_mem > self.memory_requirement
             )  # 16 GB is the minimum mem for a new instance
             # Find the freest GPU to run GPU-accelerated RL
-            gpu_avi = set_freest_gpu(mode=mode)
+            freest_gpu, gpu_avi = set_freest_gpu(mode=mode)
+            gpu_command = ["--active_gpu", freest_gpu]
             if is_enough and gpu_avi > self.min_gpu:
                 break
             else:
                 if i % 10 == 0:
                     logging.info(
-                        f"Available RAM: {available_mem} (require {self.memory_requirement}); Available GPU avilablility: {gpu_avi} (require {self.min_gpu}). Waiting for enough resouces to run node {self.idx}. Time elapsed: {i} minutes."
+                        f"Available RAM: {available_mem} (require {self.memory_requirement}); Available GPU avilablility: GPU {freest_gpu}:{gpu_avi} (require {self.min_gpu}). Waiting for enough resouces to run node {self.idx}. Time elapsed: {i} minutes."
                     )
                 time.sleep(60)
         assert i < max_waiting - 1
-        return
+        return gpu_command
 
     def run(self):
-        self._prepare_launch(mode="GTX")
+        gpu_command = self._prepare_launch(mode="GTX")
 
         # Execute the python file with flags
         rl_run_command = [
@@ -950,6 +952,7 @@ class RewardNode(Node):
             f"{self.max_iterations}",
             "--log_dir",
             self.log_dir,
+            *gpu_command,
         ]
         if self.video:
             rl_run_command.append("--video")
@@ -966,7 +969,7 @@ class RewardNode(Node):
         return self
 
     def play(self, suffix="_videos"):
-        self._prepare_launch(mode="RTX")
+        gpu_command = self._prepare_launch(mode="RTX")
 
         # Execute the python file with flags
         play_run_command = [
@@ -982,6 +985,7 @@ class RewardNode(Node):
             "--video",
             "--log_root",
             os.path.dirname(self.log_dir),
+            *gpu_command,
         ]
         if self.headless:
             play_run_command.append("--offscreen_render")
