@@ -70,7 +70,12 @@ parser.add_argument(
 parser.add_argument(
     "--active_gpu", type=int, default=0, help="GPU to launch Isaac (Vulkan)."
 )
-
+parser.add_argument(
+    "--physics_gpu", type=int, default=0, help="GPU to launch Isaac (cuda)."
+)
+parser.add_argument(
+    "--multi_gpu", type=bool, default=False, help="GPU to launch Isaac (Vulkan)."
+)
 
 dirname = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, dirname)
