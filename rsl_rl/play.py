@@ -67,6 +67,9 @@ parser.add_argument(
 parser.add_argument(
     "--precedents", nargs="+", default=None, help="Executing precedent skills."
 )
+parser.add_argument(
+    "--active_gpu", type=int, default=0, help="GPU to launch Isaac (Vulkan)."
+)
 
 
 dirname = os.path.dirname(os.path.dirname(__file__))
