@@ -884,7 +884,7 @@ class RewardNode(Node):
                 file.write(REWARD_INIT)
                 file.writelines(self.code + "\n")
         if self.precedents is not None and len(self.precedents) > 0 and self.finetune:
-            precedent_idx = list(self.precedents.keys())[0]
+            precedent_idx = list(self.precedents.keys())[-1]
             precedent_logpath = (
                 f"{self.root_dir}/envs_gpt/{self.env_name}/{precedent_idx}/logs"
             )
