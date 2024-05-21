@@ -38,8 +38,9 @@ n_success_samples: 3 # number of samples to generate success function per iterat
 n_reward_samples: 3 # number of samples to generate reward function per iteration
 reward_iterations: 4
 num_variants: 9999 # break if sufficient
-task: 'Place cube A on top of the plate.'
+task: 'Place cube A into the drawer.'
 precedents: 
+  R0ecc417f: "Open the drawer."
   Rabac9e60: "Pick up cube A."
 finetune: True
 use_wandb: True

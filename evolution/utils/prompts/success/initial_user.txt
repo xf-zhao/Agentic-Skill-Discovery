@@ -7,9 +7,9 @@ To prepare for pre-conditions, previously executed skills are:
 {precedent_skills}
 And, the next subtask is to learn {task_description}.
 
-Knowing these information, now please write a success deterministic function for this task {task_description}.
+Knowing this information, now please write a success deterministic function for this task {task_description}.
 
 - Remember to explicitly configure `SuccessCfg` so that I can directly copy the code.
-- Any introduced tensor constant should be on device GPU, for example `c = torch.tensor([1., 2.]).cuda()`
+- Any introduced tensor constant should be on the device GPU, for example `c = torch.tensor([1., 2.]).cuda()`
 - Always call `.squeeze()` for observation tensor for `drawer_open_distance` and `gripper_open_distance` to use them consistently.
 - Always call `.squeeze()` for the return of the success function.
