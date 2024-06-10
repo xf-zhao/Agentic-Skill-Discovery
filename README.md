@@ -1,4 +1,10 @@
+## Official Implementation of [Agentic Skill Discovery](https://arxiv.org/abs/2405.15019) (ASD)
 
+### Updates
+
+- DOING Currently organising code to run inside docker without manual configurations
+
+![](resources/demo.png)
 
 ## Install necessary tools
 ```bash
