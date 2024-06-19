@@ -1,10 +1,15 @@
 ## Official Implementation of [Agentic Skill Discovery](https://arxiv.org/abs/2405.15019) (ASD)
 
+![](resources/demo.png)
+
+This is the official implementation of *agentic skill discovery*, a framework driven by LLMs to generate task proposals based on the scene description and the robot's configurations. For each task, reinforcement learning processes, guided by LLM-derived success and reward functions, develop the necessary policies. An independent vision-language model ensures the reliability of learned behaviors.
+
+The simulation is based on Isaac-sim.
+
 ### Updates
 
 - DOING Currently organising code to run inside docker without manual configurations
 
-![](resources/demo.png)
 
 ## Install necessary tools
 ```bash
