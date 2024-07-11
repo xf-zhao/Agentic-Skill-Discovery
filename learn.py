@@ -10,6 +10,7 @@ from evolution.utils.extract_task_code import *
 from zero_hero.behavior import BehaviorCaptioner
 from zero_hero.core import TaskNode, TaskDatabase
 from zero_hero.utils import FakeWandb
+import json
 
 
 @hydra.main(config_path="cfg", config_name="config", version_base="1.1")
@@ -36,7 +37,9 @@ def main(cfg):
         return
     cfg.task = task
     cfg.seed = seed
-    precedents = cfg.precedents
+    if isinstance(cfg.precedents, str):
+        cfg.precedents = ast.literal_eval(cfg.precedents)
+        precedents = cfg.precedents
     if precedents is None or len(precedents) ==0:
         cfg.finetune = False
     my_cfg = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)

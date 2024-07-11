@@ -19,3 +19,4 @@ Here are some principles to follow:
 4. Specify the "<<<REUSE>>>" or "<<<INTRODUCE>>>" flag before the subtask description.
 5. The reinforcement learning agent is smart to learn complex tasks. Try to not introduce many easy subtasks. If the task is already easy, just repeat the whole task as the only subtask and number it with "0. <<<INTRODUCE>>> [new skill description]".
 6. Make the subtask list as short as possible, only stack subtasks when truly necessary!
+7. You can only reuse skills for non-conditional subtasks (if necessary, for example, for the first subtask) because all skills are learned non-conditional. Other subtasks that have pre-conditions should be newly introduced even if the skills exist in the library.
