@@ -413,6 +413,118 @@ class TaskDatabase(Database):
         return skill_df
 
 
+class SkillDatabase(Database):
+    def __init__(
+        self,
+        env_name,
+        env_idx,
+    ) -> None:
+        self.store_path = f'{ZEROHERO_ROOT_DIR}/envs_gpt/skills/{env_name.replace(" ","_")}_{env_idx}.csv'
+        self.env_name = env_name
+        self.load()
+        pass
+
+    def load(self):
+        store_path = self.store_path
+        columns = ["skill", "comment", "precedents", "reward"]
+        if os.path.exists(store_path):
+            df = pd.read_csv(store_path)
+        else:
+            os.makedirs(os.path.dirname(store_path), exist_ok=True)
+            df = pd.DataFrame(columns=columns)
+        self.df = df
+        return self
+
+    def absorb(self, task_database):
+        skills = task_database.skills
+        df = pd.DataFrame(
+            {
+                "skill": skills["command"],
+                "comment": "",
+                "precedents": "",
+                "variants": skills["variants"],
+            }
+        )
+        self.df = df
+        self.save()
+        return
+
+    def get_variant(self, index=None, task=None):
+        if index is not None:
+            line = self.df.loc[index]
+        elif task is not None:
+            line = self.df[self.df["skill"] == task]
+        variants = {line["variants"]: line["comment"]}
+        return variants
+
+    def save(self):
+        self.df.to_csv(self.store_path, index=False)
+        return
+
+    def render(self):
+        df = self.df
+        numbered_skills = "\n".join(
+            [
+                f"({i+1}) Skill: {row.skill} Comment: {row.comment}"
+                for i, row in df.iterrows()
+            ]
+        )
+        print(numbered_skills)
+        return numbered_skills
+
+    def render_success_rag(self):
+        return self._render_rag(func_type="success")
+
+    def render_reward_rag(self):
+        return self._render_rag(func_type="reward")
+
+    def _render_rag(self, func_type="success"):
+        df = self.df
+
+        def _extract_func_contents(pattern, func_file, ignore_pattern=None):
+            all_content = file_to_string(func_file)
+            func_content = re.findall(pattern, all_content)
+            func_contents = []
+            for fc in func_content:
+                content = fc[0]
+                if ignore_pattern in content:
+                    continue
+                func_contents.append(content)
+            return func_contents
+
+        def _get_succ_func_str(rid):
+            general_func_pattern = r"((?P<indent>[ \t]*)def[ \t]*(?P<name>\w+)\s*\((?P<params>.*?)\)(?:[ \t]*->[ \t]*(?P<return>[\w\.]+))?:(?P<body>(?:\n(?P=indent)(?:[ \t]+[^\n]*)|\n)+))"
+            skill_env_dir = f"{ZEROHERO_ROOT_DIR}/envs_gpt/{self.env_name}/{rid}"
+            succ_func_contents = _extract_func_contents(
+                general_func_pattern,
+                f"{skill_env_dir}/success.py",
+            )
+            return succ_func_contents
+
+        def _get_reward_func_str(rid):
+            general_func_pattern = r"((?P<indent>[ \t]*)def[ \t]*(?P<name>\w+)\s*\((?P<params>.*?)\)(?:[ \t]*->[ \t]*(?P<return>[\w\.]+))?:(?P<body>(?:\n(?P=indent)(?:[ \t]+[^\n]*)|\n)+))"
+            skill_env_dir = f"{ZEROHERO_ROOT_DIR}/envs_gpt/{self.env_name}/{rid}"
+            succ_func_content = _extract_func_contents(
+                general_func_pattern,
+                f"{skill_env_dir}/reward.py",
+                ignore_pattern="get_terminate_penalty",
+            )
+            return succ_func_content
+
+        get_func_str_call = (
+            _get_succ_func_str if func_type == "success" else _get_reward_func_str
+        )
+
+        numbered_skills = "\n".join(
+            [
+                f"({i+1}) Skill: {row.skill}.\n Comment: {row.comment}.\n Success Function: ```\n{get_func_str_call(row.variants)}\n```"
+                for i, row in df.iterrows()
+            ]
+        )
+        print(numbered_skills)
+        return numbered_skills
+
+
 class CenteralizedTask:
     def __init__(
         self,
@@ -519,6 +631,7 @@ class Node:
         precedents=None,
         local_num_syntax_error=0,
         conversation_dir=None,
+        skill_database=None,
         *args,
         **kwargs,
     ) -> None:
@@ -561,6 +674,7 @@ class Node:
             f"{self.prompt_dir}/reward/code_format_feedback.txt"
         )
         self.num_syntax_error = 0
+        self.skill_database = skill_database
 
     def init(self):
         if self.idx is None:
@@ -1212,6 +1326,7 @@ class SuccessNode(Node):
         task=None,
         best_reward=None,
         stats=None,
+        use_rag=True,
         *args,
         **kwargs,
     ) -> None:
@@ -1236,6 +1351,11 @@ class SuccessNode(Node):
 
         self.best_reward = (
             RewardNode(**best_reward) if best_reward is not None else None
+        )
+        self.initial_rag = (
+            file_to_string(f"{self.prompt_dir}/reward/initial_rag.txt")
+            if use_rag
+            else None
         )
         self.stats = (
             {
@@ -1263,6 +1383,10 @@ class SuccessNode(Node):
             self._wrap_system_message(initial_system),
             self._wrap_user_message(initial_user),
         ]
+        if self.initial_rag is not None:
+            reward_rag = self.skill_database.render_reward_rag()
+            initial_rag = self.initial_rag.format(reward_rag=reward_rag)
+            self.messages.append(self._wrap_system_message(initial_rag))
         return self
 
     def propose(
@@ -1329,6 +1453,7 @@ class SuccessNode(Node):
                 precedents=self.precedents,
                 finetune=finetune,
                 local_num_syntax_error=local_num_syntax_error,
+                skill_database=self.skill_database,
             )
             self.add_child(child)
             child.init()
@@ -1451,6 +1576,7 @@ class TaskNode(Node):
         variants=None,
         status_output=None,
         candidates=None,
+        use_rag=True,
         *args,
         **kwargs,
     ) -> None:
@@ -1461,6 +1587,11 @@ class TaskNode(Node):
         )
         self.initial_user = file_to_string(
             f"{self.prompt_dir}/success/initial_user.txt"
+        )
+        self.initial_rag = (
+            file_to_string(f"{self.prompt_dir}/success/initial_rag.txt")
+            if use_rag
+            else None
         )
         self.signature = file_to_string(f"{self.prompt_dir}/success/signature.txt")
         self.code_output_tip = file_to_string(
@@ -1503,7 +1634,10 @@ class TaskNode(Node):
             self._wrap_system_message(initial_system),
             self._wrap_user_message(initial_user),
         ]
-
+        if self.initial_rag is not None:
+            success_rag = self.skill_database.render_success_rag()
+            initial_rag = self.initial_rag.format(success_rag=success_rag)
+            self.messages.append(self._wrap_system_message(initial_rag))
         return self
 
     def provide(self, *args, **kwargs):
@@ -1554,6 +1688,7 @@ class TaskNode(Node):
                 model=model,
                 precedents=self.precedents,
                 local_num_syntax_error=local_num_syntax_error,
+                skill_database=self.skill_database,
             )
             self.add_child(child)
             child.init()

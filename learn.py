@@ -8,7 +8,7 @@ from pathlib import Path
 from evolution.utils.misc import *
 from evolution.utils.extract_task_code import *
 from zero_hero.behavior import BehaviorCaptioner
-from zero_hero.core import TaskNode, TaskDatabase
+from zero_hero.core import TaskNode, TaskDatabase, SkillDatabase
 from zero_hero.utils import FakeWandb
 import json
 
@@ -28,6 +28,7 @@ def main(cfg):
         env_name=env_name,
         env_idx=env_idx,
     )
+    sdb = SkillDatabase(env_name, env_idx)
     if specified_task:
         tdb.add_task(task)
     tdb.render()
@@ -37,10 +38,11 @@ def main(cfg):
         return
     cfg.task = task
     cfg.seed = seed
+    precedents = cfg.precedents
     if isinstance(cfg.precedents, str):
         cfg.precedents = ast.literal_eval(cfg.precedents)
         precedents = cfg.precedents
-    if precedents is None or len(precedents) ==0:
+    if precedents is None or len(precedents) == 0:
         cfg.finetune = False
     my_cfg = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     if cfg.use_wandb:
@@ -56,6 +58,7 @@ def main(cfg):
         temperature=cfg.temperature,
         model=cfg.model,
         precedents=precedents,
+        skill_database = sdb,
     ).init()
     bc = BehaviorCaptioner(
         init_sys_prompt=f"{task_node.prompt_dir}/task/behavior_context.txt",
