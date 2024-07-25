@@ -487,7 +487,7 @@ class SkillDatabase(Database):
             func_contents = []
             for fc in func_content:
                 content = fc[0]
-                if ignore_pattern in content:
+                if ignore_pattern is not None and ignore_pattern in content:
                     continue
                 func_contents.append(content)
             return func_contents
@@ -499,17 +499,19 @@ class SkillDatabase(Database):
                 general_func_pattern,
                 f"{skill_env_dir}/success.py",
             )
-            return succ_func_contents
+            succ_func_contents_str = '\n'.join(succ_func_contents)
+            return succ_func_contents_str
 
         def _get_reward_func_str(rid):
             general_func_pattern = r"((?P<indent>[ \t]*)def[ \t]*(?P<name>\w+)\s*\((?P<params>.*?)\)(?:[ \t]*->[ \t]*(?P<return>[\w\.]+))?:(?P<body>(?:\n(?P=indent)(?:[ \t]+[^\n]*)|\n)+))"
             skill_env_dir = f"{ZEROHERO_ROOT_DIR}/envs_gpt/{self.env_name}/{rid}"
-            succ_func_content = _extract_func_contents(
+            reward_func_content = _extract_func_contents(
                 general_func_pattern,
                 f"{skill_env_dir}/reward.py",
                 ignore_pattern="get_terminate_penalty",
             )
-            return succ_func_content
+            reward_func_contents_str = '\n'.join(reward_func_content)
+            return reward_func_contents_str
 
         get_func_str_call = (
             _get_succ_func_str if func_type == "success" else _get_reward_func_str
@@ -517,7 +519,7 @@ class SkillDatabase(Database):
 
         numbered_skills = "\n".join(
             [
-                f"({i+1}) Skill: {row.skill}.\n Comment: {row.comment}.\n Success Function: ```\n{get_func_str_call(row.variants)}\n```"
+                f"({i+1}) Skill: {row.skill}.\n Comment: {row.comment}.\n {func_type} function: ```\n{get_func_str_call(row.variants)}\n```"
                 for i, row in df.iterrows()
             ]
         )
