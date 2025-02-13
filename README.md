@@ -8,8 +8,10 @@ The simulation is based on Isaac-sim.
 
 ### Updates
 
-- DOING Currently organising code to run inside docker without manual configurations
+Presented in 
 
+- CoRL 2024 Workshop on Language and Robot Learning: Language as an Interface 
+- 40th Anniversary of the IEEE International Conference on Robotics and Automation (ICRA@40)
 
 ## Install necessary tools
 ```bash
